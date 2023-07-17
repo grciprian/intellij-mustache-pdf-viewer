@@ -14,6 +14,7 @@ import org.jetbrains.ide.HttpRequestHandler
 import org.jetbrains.io.FileResponses
 import org.jetbrains.io.response
 import org.jetbrains.io.send
+import java.net.URLEncoder
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
@@ -86,7 +87,8 @@ internal class PdfStaticServer : HttpRequestHandler() {
 
   fun getPreviewUrl(filePath: String, withReloadSalt: Boolean = false): String {
     val salt = if (withReloadSalt) Random.nextInt() else 0
-    val url = parseEncodedPath("$serverUrl/index.html?__reloadSalt=$salt&file=get-file/$filePath")
+    val encodedPath = URLEncoder.encode(filePath, "utf-8").replace("%2F", "/")
+    val url = parseEncodedPath("$serverUrl/index.html?__reloadSalt=$salt&file=get-file/$encodedPath")
     val server = BuiltInServerManager.getInstance()
     return server.addAuthToken(url).toExternalForm()
   }
