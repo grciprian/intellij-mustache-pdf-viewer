@@ -30,6 +30,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.jcef.JCEFHtmlPanel
+import com.intellij.util.Urls
 import com.intellij.util.ui.UIUtil
 import java.awt.Color
 import java.util.concurrent.atomic.AtomicBoolean
@@ -137,8 +138,9 @@ class PdfJcefPreviewController(val project: Project, val virtualFile: VirtualFil
         tryToPreserveState -> buildUrlWithState(base, viewState)
         else -> "$base#${createPageModeParameter(PdfViewerSettings.instance.defaultSidebarViewMode)}"
       }
+//      val url = "http://localhost:63343/64fa8636-e686-4c63-9956-132d9471ce77/index.html?__reloadSalt=1861100205&file=get-file//home/abby/Documents/test/texify/out/ma%23in.pdf#page=1&zoom=94.36799064635565,-16,843&pagemode=thumbs"
       browser.invokeAndWaitForLoadEnd {
-        logger.debug("Loading url $url")
+        logger.info("Loading url $url")
         browser.loadURL(url)
       }
     } catch(exception: Throwable) {

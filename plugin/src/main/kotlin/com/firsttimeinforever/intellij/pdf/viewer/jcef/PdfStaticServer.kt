@@ -14,6 +14,7 @@ import org.jetbrains.ide.HttpRequestHandler
 import org.jetbrains.io.FileResponses
 import org.jetbrains.io.response
 import org.jetbrains.io.send
+import java.lang.IllegalStateException
 import java.net.URLEncoder
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -33,16 +34,20 @@ internal class PdfStaticServer : HttpRequestHandler() {
     request: FullHttpRequest,
     context: ChannelHandlerContext
   ): Boolean {
-    logger.debug("Incoming request:\n\tpath: ${urlDecoder.path()}\n\tparameters: ${urlDecoder.parameters()}")
+    logger.info("Incoming request:\n\tpath: ${urlDecoder.path()}\n\tparameters: ${urlDecoder.parameters()}")
     // Check if current request is actually ours
     if (!urlDecoder.path().contains(uuid)) {
       logger.debug("Current url is not ours. Passing it to the next handler.")
       return false
     }
     val requestPath = urlDecoder.path().removePrefix("/$uuid")
-    logger.debug(requestPath)
+    logger.info(requestPath)
     if (isExternalFilePath(requestPath)) {
-      sendExternalFile(requestPath.removePrefix("/get-file/"), context, request)
+        try {
+            sendExternalFile(requestPath.removePrefix("/get-file/"), context, request)
+        } catch (e: IllegalStateException) {
+            println(e.stackTrace)
+        }
     } else {
       sendInternalFile(requestPath, context, request)
     }
@@ -54,13 +59,13 @@ internal class PdfStaticServer : HttpRequestHandler() {
   }
 
   private fun assertValidExternalPath(path: Path) {
-    check(path.extension.lowercase(Locale.getDefault()) == "pdf") { "Only pdf files can be served from the outside of jar!" }
+    check(path.extension.lowercase(Locale.getDefault()) == "pdf") { "Only pdf files outside the jar can be served!" }
   }
 
   private fun sendExternalFile(path: String, context: ChannelHandlerContext, request: FullHttpRequest) {
     val targetFile = Paths.get(path)
     assertValidExternalPath(targetFile)
-    logger.debug("Sending external file: $targetFile")
+    logger.info("Sending external file: $targetFile")
     FileResponses.sendFile(request, context.channel(), Paths.get(targetFile.toString()))
   }
 
@@ -79,7 +84,7 @@ internal class PdfStaticServer : HttpRequestHandler() {
       return
     }
     val contentType = FileResponses.getContentType(targetFile)
-    logger.debug("Sending internal file: $targetFile with contentType: $contentType")
+    logger.info("Sending internal file: $targetFile with contentType: $contentType")
     val resultBuffer = Unpooled.wrappedBuffer(PdfResourceLoader.loadFromRoot(targetFile))
     val response = response(contentType, resultBuffer)
     response.send(context.channel(), request)
@@ -87,8 +92,9 @@ internal class PdfStaticServer : HttpRequestHandler() {
 
   fun getPreviewUrl(filePath: String, withReloadSalt: Boolean = false): String {
     val salt = if (withReloadSalt) Random.nextInt() else 0
-    val encodedPath = URLEncoder.encode(filePath, "utf-8").replace("%2F", "/")
-    val url = parseEncodedPath("$serverUrl/index.html?__reloadSalt=$salt&file=get-file/$encodedPath")
+//    val encodedPath = URLEncoder.encode(filePath, "utf-8").replace("%2F", "/")
+    val encodedPath = URLEncoder.encode(filePath, "utf-8")
+    val url = parseEncodedPath("$serverUrl/index.html?__reloadSalt=$salt&file=get-file%2F$encodedPath")
     val server = BuiltInServerManager.getInstance()
     return server.addAuthToken(url).toExternalForm()
   }
