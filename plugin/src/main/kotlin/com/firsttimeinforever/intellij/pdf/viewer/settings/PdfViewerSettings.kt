@@ -10,7 +10,6 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.messages.Topic
 import com.intellij.util.xmlb.XmlSerializerUtil.copyBean
-import java.awt.Color
 
 @State(name = "PdfViewerSettings", storages = [(Storage("pdf_viewer.xml"))])
 class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
@@ -24,6 +23,8 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
   var invertColorsWithTheme = false
 
   var defaultSidebarViewMode: SidebarViewMode = SidebarViewMode.THUMBNAILS
+
+  var customMustacheFontsPath: String = defaultMustacheFontsPath
 
   fun notifyListeners() {
     ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC).settingsChanged(this)
@@ -51,6 +52,8 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
       get() = defaultForegroundColor
 
     const val defaultDocumentColorsInvertIntensity = 85
+
+    const val defaultMustacheFontsPath = "fonts"
 
     val enableExperimentalFeatures: Boolean
       get() = Registry.`is`("pdf.viewer.enableExperimentalFeatures")

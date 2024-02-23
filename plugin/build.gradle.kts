@@ -27,6 +27,7 @@ val webViewSourceDirectory = file("$projectDir/src/main/web-view")
 
 repositories {
   mavenCentral()
+  maven("https://repo1.maven.org/maven2/")
   maven("https://www.jetbrains.com/intellij-repository/snapshots")
   // maven("http://maven.geotoolkit.org/")
 }
@@ -46,6 +47,16 @@ dependencies {
   implementation(project(":model")) {
     exclude("org.jetbrains.kotlinx", "kotlinx-serialization-json")
   }
+  // https://mvnrepository.com/artifact/com.samskivert/jmustache
+  implementation("com.samskivert:jmustache:1.16")
+  // https://mvnrepository.com/artifact/com.itextpdf/itext7-core
+  implementation("com.itextpdf:itext7-core:8.0.3")
+  // https://mvnrepository.com/artifact/org.jsoup/jsoup
+//  implementation("org.jsoup:jsoup:1.17.2")
+  // https://mvnrepository.com/artifact/com.openhtmltopdf/openhtmltopdf-core
+  // implementation("com.openhtmltopdf:openhtmltopdf-core:1.0.10")
+  // https://mvnrepository.com/artifact/com.openhtmltopdf/openhtmltopdf-pdfbox
+  implementation("com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10")
   webView(project(":web-view:bootstrap"))
 }
 

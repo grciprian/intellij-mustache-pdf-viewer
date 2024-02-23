@@ -21,6 +21,7 @@ class PdfViewerSettingsForm : JPanel() {
 
   val enableDocumentAutoReload = properties.property(settings.enableDocumentAutoReload)
   val defaultSidebarViewMode = properties.property(settings.defaultSidebarViewMode)
+  val customMustacheFontsPath = properties.property(settings.customMustacheFontsPath)
 
   private val generalSettingsGroup = panel {
     group(PdfViewerBundle.message("pdf.viewer.settings.group.general")) {
@@ -40,6 +41,9 @@ class PdfViewerSettingsForm : JPanel() {
         }
         comboBox(DefaultComboBoxModel(SidebarViewMode.values()), renderer)
           .bindItem(defaultSidebarViewMode)
+      }
+      row(PdfViewerBundle.message("pdf.viewer.settings.mustache.fonts.path")) {
+        textField().bindText(customMustacheFontsPath)
       }
     }
   }
@@ -143,6 +147,7 @@ class PdfViewerSettingsForm : JPanel() {
     customForegroundColor.set(settings.customForegroundColor)
     customBackgroundColor.set(settings.customBackgroundColor)
     customIconColor.set(settings.customIconColor)
+    customMustacheFontsPath.set(settings.customMustacheFontsPath)
   }
 
   private fun resetViewerColorsToTheme() {

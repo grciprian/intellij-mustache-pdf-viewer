@@ -18,7 +18,8 @@ class PdfViewerConfigurable : Configurable {
         settings.useCustomColors != useCustomColors.get() ||
         settings.customForegroundColor != customForegroundColor.get() ||
         settings.customBackgroundColor != customBackgroundColor.get() ||
-        settings.customIconColor != customIconColor.get()
+        settings.customIconColor != customIconColor.get() ||
+        settings.customMustacheFontsPath != customMustacheFontsPath.get()
     } ?: false
   }
 
@@ -36,6 +37,7 @@ class PdfViewerConfigurable : Configurable {
       customBackgroundColor = settingsForm?.customBackgroundColor?.get() ?: customBackgroundColor
       customForegroundColor = settingsForm?.customForegroundColor?.get() ?: customForegroundColor
       customIconColor = settingsForm?.customIconColor?.get() ?: customIconColor
+      customMustacheFontsPath = settingsForm?.customMustacheFontsPath?.get() ?: customMustacheFontsPath
     }
     if (wasModified) {
       settings.notifyListeners()
