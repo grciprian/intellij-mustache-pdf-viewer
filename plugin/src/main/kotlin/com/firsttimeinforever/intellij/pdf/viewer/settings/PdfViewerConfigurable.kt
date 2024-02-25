@@ -2,9 +2,10 @@ package com.firsttimeinforever.intellij.pdf.viewer.settings
 
 import com.firsttimeinforever.intellij.pdf.viewer.PdfViewerBundle
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.Project
 import javax.swing.JComponent
 
-class PdfViewerConfigurable : Configurable {
+class PdfViewerConfigurable(val project: Project) : Configurable {
   private var settingsForm: PdfViewerSettingsForm? = null
   private val settings = PdfViewerSettings.instance
 
@@ -37,7 +38,7 @@ class PdfViewerConfigurable : Configurable {
       customBackgroundColor = settingsForm?.customBackgroundColor?.get() ?: customBackgroundColor
       customForegroundColor = settingsForm?.customForegroundColor?.get() ?: customForegroundColor
       customIconColor = settingsForm?.customIconColor?.get() ?: customIconColor
-      customMustacheFontsPath = settingsForm?.customMustacheFontsPath?.get() ?: customMustacheFontsPath
+      customMustacheFontsPath = settingsForm?.customMustacheFontsPath?.get() ?: (project.basePath ?: "")
     }
     if (wasModified) {
       settings.notifyListeners()
@@ -49,7 +50,7 @@ class PdfViewerConfigurable : Configurable {
   }
 
   override fun createComponent(): JComponent? {
-    settingsForm = settingsForm ?: PdfViewerSettingsForm()
+    settingsForm = settingsForm ?: PdfViewerSettingsForm(project)
     return settingsForm
   }
 

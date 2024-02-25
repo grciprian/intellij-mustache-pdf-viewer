@@ -24,7 +24,7 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
 
   var defaultSidebarViewMode: SidebarViewMode = SidebarViewMode.THUMBNAILS
 
-  var customMustacheFontsPath: String = defaultMustacheFontsPath
+  var customMustacheFontsPath: String = ""
 
   fun notifyListeners() {
     ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC).settingsChanged(this)
@@ -52,8 +52,6 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
       get() = defaultForegroundColor
 
     const val defaultDocumentColorsInvertIntensity = 85
-
-    const val defaultMustacheFontsPath = "fonts"
 
     val enableExperimentalFeatures: Boolean
       get() = Registry.`is`("pdf.viewer.enableExperimentalFeatures")

@@ -12,7 +12,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
   override fun getEditorTypeId() = "PDF"
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
-    return file.fileType == PdfFileType
+    return file.fileType == PdfFileType || file.extension == "mustache"
   }
 
   override fun createEditor(project: Project, file: VirtualFile): FileEditor {

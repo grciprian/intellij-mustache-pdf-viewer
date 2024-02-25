@@ -3,8 +3,10 @@ package com.firsttimeinforever.intellij.pdf.viewer.settings
 import com.firsttimeinforever.intellij.pdf.viewer.PdfViewerBundle
 import com.firsttimeinforever.intellij.pdf.viewer.model.SidebarViewMode
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.observable.properties.PropertyGraph
 import com.intellij.openapi.observable.util.not
+import com.intellij.openapi.project.Project
 import com.intellij.ui.ColorPanel
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.dsl.builder.*
@@ -13,7 +15,7 @@ import java.awt.Color
 import javax.swing.DefaultComboBoxModel
 import javax.swing.JPanel
 
-class PdfViewerSettingsForm : JPanel() {
+class PdfViewerSettingsForm(val project: Project) : JPanel() {
   private val settings
     get() = PdfViewerSettings.instance
 
@@ -43,7 +45,9 @@ class PdfViewerSettingsForm : JPanel() {
           .bindItem(defaultSidebarViewMode)
       }
       row(PdfViewerBundle.message("pdf.viewer.settings.mustache.fonts.path")) {
-        textField().bindText(customMustacheFontsPath)
+        val folderDescriptor = FileChooserDescriptor(false, true, false, false, false, false)
+        textFieldWithBrowseButton(null, project, folderDescriptor, null)
+          .bindText(customMustacheFontsPath)
       }
     }
   }
