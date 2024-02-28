@@ -26,6 +26,8 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
 
   var customMustacheFontsPath: String = ""
 
+  var isVerticalSplit = false
+
   fun notifyListeners() {
     ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC).settingsChanged(this)
   }

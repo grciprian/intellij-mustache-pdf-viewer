@@ -10,6 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.ui.ColorPanel
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.dsl.builder.*
+import org.jetbrains.annotations.Nls
 import java.awt.BorderLayout
 import java.awt.Color
 import javax.swing.DefaultComboBoxModel
@@ -24,6 +25,7 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
   val enableDocumentAutoReload = properties.property(settings.enableDocumentAutoReload)
   val defaultSidebarViewMode = properties.property(settings.defaultSidebarViewMode)
   val customMustacheFontsPath = properties.property(settings.customMustacheFontsPath)
+  val isVerticalSplit = properties.property(settings.isVerticalSplit)
 
   private val generalSettingsGroup = panel {
     group(PdfViewerBundle.message("pdf.viewer.settings.group.general")) {
@@ -49,6 +51,12 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
         textFieldWithBrowseButton(null, project, folderDescriptor, null)
           .bindText(customMustacheFontsPath)
       }
+      row(PdfViewerBundle.message("pdf.viewer.settings.mustache.preview.layout.label")) {
+        comboBox(
+          model = DefaultComboBoxModel(arrayOf(false, true)),
+          renderer = SimpleListCellRenderer.create("", ::presentSplitLayout)
+        ).bindItem(isVerticalSplit)
+      }.bottomGap(BottomGap.SMALL)
     }
   }
 
@@ -162,6 +170,14 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
       customForegroundColor.set(defaultForegroundColor.rgb)
       iconColorPanel.selectedColor = defaultIconColor
       customIconColor.set(defaultIconColor.rgb)
+    }
+  }
+
+  private fun presentSplitLayout(splitLayout: Boolean?): @Nls String {
+    return when (splitLayout) {
+      false -> PdfViewerBundle.message("pdf.viewer.settings.mustache.preview.layout.horizontal")
+      true -> PdfViewerBundle.message("pdf.viewer.settings.mustache.preview.layout.vertical")
+      else -> ""
     }
   }
 }

@@ -20,7 +20,8 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
         settings.customForegroundColor != customForegroundColor.get() ||
         settings.customBackgroundColor != customBackgroundColor.get() ||
         settings.customIconColor != customIconColor.get() ||
-        settings.customMustacheFontsPath != customMustacheFontsPath.get()
+        settings.customMustacheFontsPath != customMustacheFontsPath.get() ||
+        settings.isVerticalSplit != isVerticalSplit.get()
     } ?: false
   }
 
@@ -39,6 +40,7 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
       customForegroundColor = settingsForm?.customForegroundColor?.get() ?: customForegroundColor
       customIconColor = settingsForm?.customIconColor?.get() ?: customIconColor
       customMustacheFontsPath = settingsForm?.customMustacheFontsPath?.get() ?: (project.basePath ?: "")
+      isVerticalSplit = settingsForm?.isVerticalSplit?.get() ?: isVerticalSplit
     }
     if (wasModified) {
       settings.notifyListeners()
