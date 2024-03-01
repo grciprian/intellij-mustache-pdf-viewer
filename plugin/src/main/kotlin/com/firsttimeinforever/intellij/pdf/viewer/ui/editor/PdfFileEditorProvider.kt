@@ -6,7 +6,11 @@ import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import generate.PdfGenerationService
+import java.nio.file.Files
+import java.nio.file.Path
 
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
 
@@ -26,12 +30,14 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
   override fun createEditorAsync(project: Project, file: VirtualFile): AsyncFileEditorProvider.Builder {
     return object : AsyncFileEditorProvider.Builder() {
       override fun build(): FileEditor {
-        val pdfFileEditor = PdfFileEditor(project, file)
         if (file.fileType == PdfFileType) {
-          return pdfFileEditor
+          return PdfFileEditor(project, file)
         } else if (mainProvider.accept(project, file) && file.extension == "mustache") {
           val firstBuilder = createEditorBuilder(mainProvider, project, file)
-          return MustacheFileEditor(project, firstBuilder.build() as TextEditor, pdfFileEditor)
+          return when (val processedPdfFile = getProcessedPdfFile(file)) {
+            null -> throw RuntimeException("Processed pdf file not found...")
+            else -> MustacheFileEditor(project, firstBuilder.build() as TextEditor, PdfFileEditor(project, processedPdfFile))
+          }
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
       }
@@ -52,6 +58,20 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
       override fun build(): FileEditor {
         return provider.createEditor(project, file)
       }
+    }
+  }
+
+  companion object {
+    private val TEMP_PDF_NAME = "temp.pdf"
+
+    fun getProcessedPdfFile(file: VirtualFile): VirtualFile? {
+      val pdfByteArray = PdfGenerationService.getInstance(file).generatePdf(HashMap<String, String>(), VfsUtil.loadText(file))
+      val outputPath = Path.of(TEMP_PDF_NAME)
+      if (!Files.exists(outputPath)) {
+        Files.createFile(outputPath)
+      }
+      Files.write(outputPath, pdfByteArray)
+      return VfsUtil.findFile(outputPath, true)
     }
   }
 }

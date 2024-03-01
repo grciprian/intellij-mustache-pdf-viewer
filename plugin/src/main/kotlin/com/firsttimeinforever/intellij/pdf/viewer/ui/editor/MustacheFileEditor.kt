@@ -7,12 +7,15 @@ import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import org.jetbrains.annotations.NotNull
 
 class MustacheFileEditor(
   project: @NotNull Project,
-  editor: @NotNull TextEditor,
-  preview: @NotNull PdfFileEditor
+  val editor: @NotNull TextEditor,
+  val preview: @NotNull PdfFileEditor
 ) : TextEditorWithPreview(
   editor,
   preview,
@@ -21,12 +24,24 @@ class MustacheFileEditor(
   !PdfViewerSettings.instance.isVerticalSplit
 ) {
   private val messageBusConnection = project.messageBus.connect()
+  private val fileEditorChangedListener = FileEditorChangedListener()
 
   init {
     Disposer.register(this, messageBusConnection)
+    messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileEditorChangedListener)
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC, PdfViewerSettingsListener {
       handleLayoutChange(!it.isVerticalSplit)
     })
+  }
+
+  private inner class FileEditorChangedListener : BulkFileListener {
+    override fun after(events: MutableList<out VFileEvent>) {
+      if (events.any { it.file == editor.file }) {
+        logger.debug("Target file ${editor.file} changed. Reloading preview.")
+        PdfFileEditorProvider.getProcessedPdfFile(editor.file)
+        preview.viewComponent.controller?.reload(tryToPreserveState = true)
+      }
+    }
   }
 
   companion object {
