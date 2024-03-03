@@ -39,7 +39,12 @@ class MustacheFileEditor(
       if (events.any { it.file == editor.file }) {
         logger.debug("Target file ${editor.file} changed. Reloading preview.")
         PdfFileEditorProvider.getProcessedPdfFile(editor.file)
-        preview.viewComponent.controller?.reload(tryToPreserveState = true)
+        if (preview.viewComponent.controller == null) {
+          logger.warn("FileChangedListener was called for view with controller == null!")
+        } else if (events.any { it.file == editor.file }) {
+          logger.debug("Target file ${editor.file.path} changed. Reloading current view.")
+          preview.viewComponent.controller.reload(tryToPreserveState = true)
+        }
       }
     }
   }

@@ -3,6 +3,7 @@ package generate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
@@ -14,10 +15,12 @@ import org.jsoup.nodes.Entities;
 import java.awt.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.*;
 
 public class PdfGenerationService {
 
-  public static final String DEFAULT_PREFIX = "/templates";
+  public static final String DEFAULT_PREFIX = "/templates/";
   public static final String DEFAULT_SUFFIX = ".mustache";
   public static final String JAVA_RESOURCES_FOLDER_NAME = "resources";
   static final String PDF_GENERATION_ERROR = "A apărut o problemă în momentul generării fișierului";
@@ -31,21 +34,58 @@ public class PdfGenerationService {
     this.mustacheCompiler = compiler;
   }
 
-  public static PdfGenerationService getInstance(VirtualFile forFile) {
-    var forFileCanonicalPath = forFile.getCanonicalPath();
-    assert forFileCanonicalPath != null;
+  public static String getFileResourcesPathWithPrefix(VirtualFile file) {
+    var forFileCanonicalPath = file.getCanonicalPath();
+    Objects.requireNonNull(forFileCanonicalPath);
     var resourcesIndex = forFileCanonicalPath.indexOf(JAVA_RESOURCES_FOLDER_NAME);
-    if (resourcesIndex != -1) {
-      var forFileResourcesPath = forFileCanonicalPath.substring(0, resourcesIndex + JAVA_RESOURCES_FOLDER_NAME.length());
-      if (PdfGenerationService.pdfGenerationService != null) return PdfGenerationService.pdfGenerationService;
-      PdfGenerationService.pdfGenerationService = new PdfGenerationService(
-        Mustache.compiler().withLoader(name -> new FileReader(
-          new File(forFileResourcesPath + DEFAULT_PREFIX, name + DEFAULT_SUFFIX))
-        )
-      );
-      return PdfGenerationService.pdfGenerationService;
-    }
+    if (resourcesIndex != -1)
+      return forFileCanonicalPath.substring(0, resourcesIndex + JAVA_RESOURCES_FOLDER_NAME.length()) + DEFAULT_PREFIX;
     throw new RuntimeException("File is not in the resources folder of the java project!");
+  }
+
+  public static PdfGenerationService getInstance(VirtualFile forFile) {
+
+    var includeMap = new HashMap<String, IncludeProps>();
+    var fileResourcesPathWithPrefix = getFileResourcesPathWithPrefix(forFile);
+
+    var root = VfsUtil.findFile(Path.of(fileResourcesPathWithPrefix), true);
+    Objects.requireNonNull(root);
+    // TODO tratare daca nu e gasit root resources with prefix
+    VfsUtil.processFileRecursivelyWithoutIgnored(root, file -> {
+      if (file.isDirectory()) return true;
+      var indexOfSuffix = file.getCanonicalPath().indexOf(DEFAULT_SUFFIX);
+      if (indexOfSuffix == -1) indexOfSuffix = file.getCanonicalPath().length();
+      var relativePathFromResourcesPath = file.getCanonicalPath().substring(fileResourcesPathWithPrefix.length(), indexOfSuffix);
+      if (!includeMap.containsKey(relativePathFromResourcesPath)) {
+        includeMap.put(relativePathFromResourcesPath, new IncludeProps(0, new HashSet<>()));
+      }
+      try {
+        var contents = VfsUtil.loadText(file);
+        Arrays.stream(contents.split("(\\{\\{>)")).skip(1)
+          .forEach(include -> {
+            var indexOfIncludeEnd = include.indexOf("}}");
+            if (indexOfIncludeEnd == -1) throw new RuntimeException("Malformed include found!");
+            var cleanedUpInclude = include.substring(0, indexOfIncludeEnd);
+            var maybeExistingEntry = includeMap.getOrDefault(cleanedUpInclude, new IncludeProps(0, new HashSet<>()));
+            maybeExistingEntry.directParents.add(relativePathFromResourcesPath);
+            includeMap.put(cleanedUpInclude, new IncludeProps(maybeExistingEntry.numberOfIncludes + 1, maybeExistingEntry.directParents));
+          });
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      return true;
+    });
+
+    //process and filter main directParents into rootParents
+    includeMap.values().forEach(includeProps -> includeProps.processRootParentsBasedOn(includeMap));
+
+    if (PdfGenerationService.pdfGenerationService != null) return PdfGenerationService.pdfGenerationService;
+    PdfGenerationService.pdfGenerationService = new PdfGenerationService(
+      Mustache.compiler().withLoader(name -> new FileReader(
+        new File(fileResourcesPathWithPrefix, name + DEFAULT_SUFFIX))
+      )
+    );
+    return PdfGenerationService.pdfGenerationService;
   }
 
   public byte[] generatePdf(Object model, String templateContent) {
@@ -105,6 +145,29 @@ public class PdfGenerationService {
       return mustacheCompiler.defaultValue("-").nullValue("-").compile(templateContent).execute(model);
     } catch (Exception exception) {
       throw new RuntimeException(PDF_GENERATION_ERROR, exception);
+    }
+  }
+
+  private static class IncludeProps {
+
+    private final Integer numberOfIncludes;
+    private final Set<String> directParents;
+    private final Set<String> rootParents = new HashSet<>();
+
+    IncludeProps(Integer numberOfIncludes, Set<String> directParents) {
+      this.numberOfIncludes = numberOfIncludes;
+      this.directParents = directParents;
+    }
+
+    IncludeProps(Integer numberOfIncludes, Set<String> directParents, Set<String> rootParents) {
+      this(numberOfIncludes, directParents);
+      this.rootParents.addAll(rootParents);
+    }
+
+    public void processRootParentsBasedOn(Map<String, IncludeProps> includeMap) {
+//      for(var parent : this.directParents) {
+//        while(includeMap.get(parent).) // TODO FIX THIS
+//      }
     }
   }
 }
