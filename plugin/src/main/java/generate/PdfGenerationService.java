@@ -17,6 +17,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class PdfGenerationService {
 
@@ -57,7 +58,7 @@ public class PdfGenerationService {
       if (indexOfSuffix == -1) indexOfSuffix = file.getCanonicalPath().length();
       var relativePathFromResourcesPath = file.getCanonicalPath().substring(fileResourcesPathWithPrefix.length(), indexOfSuffix);
       if (!includeMap.containsKey(relativePathFromResourcesPath)) {
-        includeMap.put(relativePathFromResourcesPath, new IncludeProps(0, new HashSet<>()));
+        includeMap.put(relativePathFromResourcesPath, IncludeProps.getEmpty());
       }
       try {
         var contents = VfsUtil.loadText(file);
@@ -66,7 +67,7 @@ public class PdfGenerationService {
             var indexOfIncludeEnd = include.indexOf("}}");
             if (indexOfIncludeEnd == -1) throw new RuntimeException("Malformed include found!");
             var cleanedUpInclude = include.substring(0, indexOfIncludeEnd);
-            var maybeExistingEntry = includeMap.getOrDefault(cleanedUpInclude, new IncludeProps(0, new HashSet<>()));
+            var maybeExistingEntry = includeMap.getOrDefault(cleanedUpInclude, IncludeProps.getEmpty());
             maybeExistingEntry.directParents.add(relativePathFromResourcesPath);
             includeMap.put(cleanedUpInclude, new IncludeProps(maybeExistingEntry.numberOfIncludes + 1, maybeExistingEntry.directParents));
           });
@@ -154,20 +155,31 @@ public class PdfGenerationService {
     private final Set<String> directParents;
     private final Set<String> rootParents = new HashSet<>();
 
+    public Set<String> getRootParents() {
+      return rootParents;
+    }
+
     IncludeProps(Integer numberOfIncludes, Set<String> directParents) {
       this.numberOfIncludes = numberOfIncludes;
       this.directParents = directParents;
     }
 
-    IncludeProps(Integer numberOfIncludes, Set<String> directParents, Set<String> rootParents) {
-      this(numberOfIncludes, directParents);
-      this.rootParents.addAll(rootParents);
+    public static IncludeProps getEmpty() {
+      return new IncludeProps(0, new HashSet<>());
     }
 
     public void processRootParentsBasedOn(Map<String, IncludeProps> includeMap) {
-//      for(var parent : this.directParents) {
-//        while(includeMap.get(parent).) // TODO FIX THIS
-//      }
+      Set<String> dp = new HashSet<>(this.directParents);
+      while (!dp.isEmpty()) {
+        this.rootParents.addAll(
+          dp.stream()
+            .filter(directParent -> includeMap.getOrDefault(directParent, IncludeProps.getEmpty()).directParents.isEmpty())
+            .collect(Collectors.toUnmodifiableSet())
+        );
+        dp = dp.stream()
+          .filter(directParent -> !includeMap.getOrDefault(directParent, IncludeProps.getEmpty()).directParents.isEmpty())
+          .collect(Collectors.toUnmodifiableSet());
+      }
     }
   }
 }
