@@ -155,10 +155,6 @@ public class PdfGenerationService {
     private final Set<String> directParents;
     private final Set<String> rootParents = new HashSet<>();
 
-    public Set<String> getRootParents() {
-      return rootParents;
-    }
-
     IncludeProps(Integer numberOfIncludes, Set<String> directParents) {
       this.numberOfIncludes = numberOfIncludes;
       this.directParents = directParents;
@@ -168,16 +164,25 @@ public class PdfGenerationService {
       return new IncludeProps(0, new HashSet<>());
     }
 
+    public Set<String> getRootParents() {
+      return rootParents;
+    }
+
     public void processRootParentsBasedOn(Map<String, IncludeProps> includeMap) {
       Set<String> dp = new HashSet<>(this.directParents);
       while (!dp.isEmpty()) {
+        // adauga la rootParents toti directParents care nu mai au directParents
         this.rootParents.addAll(
           dp.stream()
             .filter(directParent -> includeMap.getOrDefault(directParent, IncludeProps.getEmpty()).directParents.isEmpty())
             .collect(Collectors.toUnmodifiableSet())
         );
+
+        // filtreaza directParents care au directParents si devine noul directParents pentru a se duce pe flow in sus pana ajunge la rootParents
         dp = dp.stream()
           .filter(directParent -> !includeMap.getOrDefault(directParent, IncludeProps.getEmpty()).directParents.isEmpty())
+          .map(directParentWithDirectParents -> includeMap.getOrDefault(directParentWithDirectParents, IncludeProps.getEmpty()).directParents)
+          .flatMap(Set::stream)
           .collect(Collectors.toUnmodifiableSet());
       }
     }
