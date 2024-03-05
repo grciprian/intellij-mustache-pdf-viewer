@@ -43,7 +43,7 @@ class MustacheFileEditor(
           logger.warn("FileChangedListener was called for view with controller == null!")
         } else if (events.any { it.file == editor.file }) {
           logger.debug("Target file ${editor.file.path} changed. Reloading current view.")
-          preview.viewComponent.controller.reload(tryToPreserveState = true)
+          preview.viewComponent.controller?.reload(tryToPreserveState = true)
         }
       }
     }

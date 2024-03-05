@@ -3,7 +3,7 @@ package com.firsttimeinforever.intellij.pdf.viewer.actions
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 
-class PdfSidebarViewModeActionGroup : DefaultActionGroup() {
+class xPdfSidebarViewModeActionGroup : DefaultActionGroup() {
   override fun isPopup(): Boolean = true
 
   override fun update(event: AnActionEvent) {
