@@ -16,23 +16,12 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.ui.components.JBTabbedPane
 import javax.swing.JComponent
+import javax.swing.JTabbedPane
+
 
 // TODO: Implement state persistence
 class PdfFileEditor(project: Project, private val virtualFile: VirtualFile) : FileEditorBase(), DumbAware {
-  //  val viewComponent = PdfEditorViewComponent(project, virtualFile)
-  val jbTabbedPane = JBTabbedPane()
-
-  init {
-    jbTabbedPane.insertTab(virtualFile.canonicalPath, null, PdfEditorViewComponent(project, virtualFile), "TIP", 0)
-  }
-
-  val viewComponent: PdfEditorViewComponent
-    get() {
-      var selectedTab = jbTabbedPane.selectedIndex
-      if (jbTabbedPane.selectedIndex != -1) selectedTab = 0
-      return jbTabbedPane.getTabComponentAt(selectedTab) as PdfEditorViewComponent
-    }
-
+  var viewComponent = PdfEditorViewComponent(project, virtualFile)
   private val messageBusConnection = project.messageBus.connect()
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
 
@@ -49,9 +38,9 @@ class PdfFileEditor(project: Project, private val virtualFile: VirtualFile) : Fi
 
   override fun getFile(): VirtualFile = virtualFile
 
-  override fun getComponent(): JComponent = jbTabbedPane
+  override fun getComponent(): JComponent = viewComponent
 
-  override fun getPreferredFocusedComponent(): JComponent = getActiveTab()
+  override fun getPreferredFocusedComponent(): JComponent = viewComponent.controlPanel
 
   private inner class FileChangedListener(var isEnabled: Boolean = true) : BulkFileListener {
     override fun after(events: MutableList<out VFileEvent>) {

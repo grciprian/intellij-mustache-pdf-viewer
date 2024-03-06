@@ -15,7 +15,7 @@ import org.jetbrains.annotations.NotNull
 class MustacheFileEditor(
   project: @NotNull Project,
   val editor: @NotNull TextEditor,
-  val preview: @NotNull PdfFileEditor
+  val preview: @NotNull PdfFileEditorWrapper
 ) : TextEditorWithPreview(
   editor,
   preview,
@@ -36,16 +36,16 @@ class MustacheFileEditor(
 
   private inner class FileEditorChangedListener : BulkFileListener {
     override fun after(events: MutableList<out VFileEvent>) {
-      if (events.any { it.file == editor.file }) {
-        logger.debug("Target file ${editor.file} changed. Reloading preview.")
-        PdfFileEditorProvider.getProcessedPdfFile(editor.file)
-        if (preview.viewComponent.controller == null) {
-          logger.warn("FileChangedListener was called for view with controller == null!")
-        } else if (events.any { it.file == editor.file }) {
-          logger.debug("Target file ${editor.file.path} changed. Reloading current view.")
-          preview.viewComponent.controller?.reload(tryToPreserveState = true)
-        }
-      }
+//      if (events.any { it.file == editor.file }) {
+//        logger.debug("Target file ${editor.file} changed. Reloading preview.")
+//        PdfFileEditorProvider.getProcessedPdfFile(editor.file)
+//        if (preview.viewComponent.controller == null) {
+//          logger.warn("FileChangedListener was called for view with controller == null!")
+//        } else if (events.any { it.file == editor.file }) {
+//          logger.debug("Target file ${editor.file.path} changed. Reloading current view.")
+//          preview.viewComponent.controller?.reload(tryToPreserveState = true)
+//        }
+//      }
     }
   }
 

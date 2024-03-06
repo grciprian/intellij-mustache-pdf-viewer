@@ -33,11 +33,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
         if (file.fileType == PdfFileType) {
           return PdfFileEditor(project, file)
         } else if (mainProvider.accept(project, file) && file.extension == "mustache") {
-          val firstBuilder = createEditorBuilder(mainProvider, project, file)
-          return when (val processedPdfFile = getProcessedPdfFile(file)) {
-            null -> throw RuntimeException("Processed pdf file not found...")
-            else -> MustacheFileEditor(project, firstBuilder.build() as TextEditor, PdfFileEditor(project, processedPdfFile))
-          }
+          return MustacheFileEditor(project, createEditorBuilder(mainProvider, project, file).build() as TextEditor, PdfFileEditorWrapper(project, file));
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
       }
@@ -58,20 +54,6 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
       override fun build(): FileEditor {
         return provider.createEditor(project, file)
       }
-    }
-  }
-
-  companion object {
-    private val TEMP_PDF_NAME = "temp.pdf"
-
-    fun getProcessedPdfFile(file: VirtualFile): VirtualFile? {
-      val pdfByteArray = PdfGenerationService.getInstance(file).generatePdf(HashMap<String, String>(), VfsUtil.loadText(file))
-      val outputPath = Path.of(TEMP_PDF_NAME)
-      if (!Files.exists(outputPath)) {
-        Files.createFile(outputPath)
-      }
-      Files.write(outputPath, pdfByteArray)
-      return VfsUtil.findFile(outputPath, true)
     }
   }
 }
