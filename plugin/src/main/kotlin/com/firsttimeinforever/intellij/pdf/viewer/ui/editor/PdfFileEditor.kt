@@ -14,19 +14,16 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
-import com.intellij.ui.components.JBTabbedPane
 import javax.swing.JComponent
-import javax.swing.JTabbedPane
-
 
 // TODO: Implement state persistence
 class PdfFileEditor(project: Project, private val virtualFile: VirtualFile) : FileEditorBase(), DumbAware {
-  var viewComponent = PdfEditorViewComponent(project, virtualFile)
+  val viewComponent = PdfEditorViewComponent(project, virtualFile)
   private val messageBusConnection = project.messageBus.connect()
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
 
   init {
-    Disposer.register(this, getActiveTab())
+    Disposer.register(this, viewComponent)
     Disposer.register(this, messageBusConnection)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC, PdfViewerSettingsListener {
@@ -47,21 +44,17 @@ class PdfFileEditor(project: Project, private val virtualFile: VirtualFile) : Fi
       if (!isEnabled) {
         return
       }
-      if (getActiveTab().controller == null) {
+      if (viewComponent.controller == null) {
         logger.warn("FileChangedListener was called for view with controller == null!")
       } else if (events.any { it.file == virtualFile }) {
         logger.debug("Target file ${virtualFile.path} changed. Reloading current view.")
-        getActiveTab().controller?.reload(tryToPreserveState = true)
+        viewComponent.controller.reload(tryToPreserveState = true)
       }
     }
   }
 
   override fun getStructureViewBuilder(): StructureViewBuilder {
     return PdfStructureViewBuilder(this)
-  }
-
-  private fun getActiveTab(): PdfEditorViewComponent {
-    return jbTabbedPane.selectedComponent as PdfEditorViewComponent
   }
 
   companion object {

@@ -2,6 +2,7 @@ package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtil
@@ -14,33 +15,28 @@ import java.nio.file.Path
 import java.util.*
 import java.util.stream.Collectors
 import javax.swing.JComponent
-import javax.swing.JTabbedPane
 
 class PdfFileEditorWrapper(project: Project, virtualFile: VirtualFile) : FileEditorBase(), DumbAware {
 
   private val fileIncludeProps = processFileIncludesProps(virtualFile)
-  val jbTabbedPane = JBTabbedPane()
+  private val jbTabbedPane = JBTabbedPane()
 
   init {
     if (fileIncludeProps.rootParents.isNotEmpty()) {
-      val fileResourcesPathWithPrefix = PdfGenerationService.getFileResourcesPathWithPrefix(file)
-      val rootMustacheFile = VfsUtil.findFile(Path.of(fileResourcesPathWithPrefix + fileIncludeProps.rootParents.first()), true)
-      Objects.requireNonNull(rootMustacheFile)
+      val fileResourcesPathWithPrefix = PdfGenerationService.getFileResourcesPathWithPrefix(virtualFile)
+      val firstRootMustacheFilename = fileIncludeProps.rootParents.first();
+      val rootMustacheFile = VfsUtil.findFile(Path.of(fileResourcesPathWithPrefix + firstRootMustacheFilename), true)
       val processedPdfFile = getProcessedPdfFile(rootMustacheFile!!)
+      val editor =  PdfFileEditor(project, processedPdfFile!!) // treat processedPdfFile null case
+      jbTabbedPane.insertTab(firstRootMustacheFilename, null, editor.viewComponent, null, 0)
     }
   }
 
-  override fun getComponent(): JComponent {
-    TODO("Not yet implemented")
-  }
+  override fun getComponent(): JComponent = jbTabbedPane
 
-  override fun getName(): String {
-    TODO("Not yet implemented")
-  }
+  override fun getName(): String = NAME
 
-  override fun getPreferredFocusedComponent(): JComponent? {
-    TODO("Not yet implemented")
-  }
+  override fun getPreferredFocusedComponent(): JComponent = getActiveTab()
 
   private fun processFileIncludesProps(file: VirtualFile): IncludeProps {
     val includeMap = HashMap<String, IncludeProps>()
@@ -96,33 +92,22 @@ class PdfFileEditorWrapper(project: Project, virtualFile: VirtualFile) : FileEdi
       var dp: Set<String> = HashSet(this.directParents)
       while (dp.isNotEmpty()) {
         // adauga la rootParents toti directParents care nu mai au directParents
-        rootParents.addAll(
-          dp.stream()
-            .filter { directParent: String? ->
-              includeMap.getOrDefault(
-                directParent,
-                empty
-              ).directParents.isEmpty()
-            }
-            .collect(Collectors.toUnmodifiableSet())
-        )
+        rootParents.addAll(dp.stream().filter { directParent: String? ->
+            includeMap.getOrDefault(
+              directParent, empty
+            ).directParents.isEmpty()
+          }.collect(Collectors.toUnmodifiableSet()))
 
         // filtreaza directParents care au directParents si devine noul directParents pentru a se duce pe flow in sus pana ajunge la rootParents
-        dp = dp.stream()
-          .filter { directParent: String? ->
+        dp = dp.stream().filter { directParent: String? ->
             includeMap.getOrDefault(
-              directParent,
-              empty
+              directParent, empty
             ).directParents.isNotEmpty()
-          }
-          .map { directParentWithDirectParents: String? ->
+          }.map { directParentWithDirectParents: String? ->
             includeMap.getOrDefault(
-              directParentWithDirectParents,
-              empty
+              directParentWithDirectParents, empty
             ).directParents
-          }
-          .flatMap { obj: Set<String> -> obj.stream() }
-          .collect(Collectors.toUnmodifiableSet())
+          }.flatMap { obj: Set<String> -> obj.stream() }.collect(Collectors.toUnmodifiableSet())
       }
     }
 
@@ -132,8 +117,14 @@ class PdfFileEditorWrapper(project: Project, virtualFile: VirtualFile) : FileEdi
     }
   }
 
+  private fun getActiveTab(): PdfEditorViewComponent {
+    return jbTabbedPane.selectedComponent as PdfEditorViewComponent
+  }
+
   companion object {
-    private val TEMP_PDF_NAME = "temp.pdf"
+    private const val TEMP_PDF_NAME = "temp.pdf"
+    private const val NAME = "Pdf Wrapper Viewer File Editor"
+    private val logger = logger<PdfFileEditorWrapper>()
 
     fun getProcessedPdfFile(file: VirtualFile): VirtualFile? {
       val pdfByteArray = PdfGenerationService.getInstance(file).generatePdf(HashMap<String, String>(), VfsUtil.loadText(file))
