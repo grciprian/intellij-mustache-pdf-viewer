@@ -8,28 +8,29 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
+import generate.MustacheIncludeProcessor.processFileIncludeProps
 import generate.PdfGenerationService
-import java.io.IOException
+import generate.PdfGenerationService.DEFAULT_SUFFIX
+import generate.PdfGenerationService.getFileResourcesPathWithPrefix
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.*
-import java.util.stream.Collectors
 import javax.swing.JComponent
 
 class PdfFileEditorWrapper(project: Project, virtualFile: VirtualFile) : FileEditorBase(), DumbAware {
 
-  private val fileIncludeProps = processFileIncludesProps(virtualFile)
+  private val fileIncludeEntry = processFileIncludeProps(virtualFile)
   private val jbTabbedPane = JBTabbedPane()
 
   init {
-    if (fileIncludeProps.rootParents.isNotEmpty()) {
-      val fileResourcesPathWithPrefix = PdfGenerationService.getFileResourcesPathWithPrefix(virtualFile)
-      val firstRootMustacheFilename = fileIncludeProps.rootParents.first();
-      val rootMustacheFile = VfsUtil.findFile(Path.of(fileResourcesPathWithPrefix + firstRootMustacheFilename), true)
-      val processedPdfFile = getProcessedPdfFile(rootMustacheFile!!)
-      val editor =  PdfFileEditor(project, processedPdfFile!!) // treat processedPdfFile null case
-      jbTabbedPane.insertTab(firstRootMustacheFilename, null, editor.viewComponent, null, 0)
+    val fileResourcesPathWithPrefix = getFileResourcesPathWithPrefix(virtualFile)
+    var fileToBeProcessed: String = fileIncludeEntry.key;
+    if (fileIncludeEntry.value.rootParents.isNotEmpty()) {
+      fileToBeProcessed = fileIncludeEntry.value.rootParents.first()
     }
+    val rootMustacheFile = VfsUtil.findFile(Path.of(fileResourcesPathWithPrefix + fileToBeProcessed + DEFAULT_SUFFIX), true)
+    val processedPdfFile = getProcessedPdfFile(rootMustacheFile!!)
+    val editor = PdfFileEditor(project, processedPdfFile!!) // treat processedPdfFile null case
+    jbTabbedPane.insertTab(fileToBeProcessed, null, editor.component, null, 0)
   }
 
   override fun getComponent(): JComponent = jbTabbedPane
@@ -37,85 +38,6 @@ class PdfFileEditorWrapper(project: Project, virtualFile: VirtualFile) : FileEdi
   override fun getName(): String = NAME
 
   override fun getPreferredFocusedComponent(): JComponent = getActiveTab()
-
-  private fun processFileIncludesProps(file: VirtualFile): IncludeProps {
-    val includeMap = HashMap<String, IncludeProps>()
-
-    val fileResourcesPathWithPrefix = PdfGenerationService.getFileResourcesPathWithPrefix(file)
-    val root = VfsUtil.findFile(Path.of(fileResourcesPathWithPrefix), true)
-    Objects.requireNonNull(root)
-
-    // TODO tratare daca nu e gasit root resources with prefix
-    VfsUtil.processFileRecursivelyWithoutIgnored(root!!) { f: VirtualFile ->
-      if (f.isDirectory) return@processFileRecursivelyWithoutIgnored true
-      var indexOfSuffix = f.canonicalPath!!.indexOf(PdfGenerationService.DEFAULT_SUFFIX)
-      if (indexOfSuffix == -1) indexOfSuffix = f.canonicalPath!!.length
-      val relativePathFromResourcesPath = f.canonicalPath!!.substring(fileResourcesPathWithPrefix.length, indexOfSuffix)
-      if (!includeMap.containsKey(relativePathFromResourcesPath)) {
-        includeMap[relativePathFromResourcesPath] = IncludeProps.empty
-      }
-      try {
-        val contents = VfsUtil.loadText(f)
-        Arrays.stream(contents.split("(\\{\\{>)".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()).skip(1)
-          .forEach { include: String ->
-            val indexOfIncludeEnd = include.indexOf("}}")
-            if (indexOfIncludeEnd == -1) throw RuntimeException("Malformed include found!")
-            val cleanedUpInclude = include.substring(0, indexOfIncludeEnd)
-            val maybeExistingEntry = includeMap.getOrDefault(cleanedUpInclude, IncludeProps.empty)
-            maybeExistingEntry.directParents.plus(relativePathFromResourcesPath)
-            includeMap[cleanedUpInclude] = IncludeProps(maybeExistingEntry.numberOfIncludes + 1, maybeExistingEntry.directParents)
-          }
-      } catch (e: IOException) {
-        throw RuntimeException(e)
-      }
-      true
-    }
-
-
-    //process and filter main directParents into rootParents
-    includeMap.values.forEach { includeProps: IncludeProps ->
-      includeProps.processRootParentsBasedOn(
-        includeMap
-      )
-    }
-
-    var indexOfSuffix = file.canonicalPath!!.indexOf(PdfGenerationService.DEFAULT_SUFFIX)
-    if (indexOfSuffix == -1) indexOfSuffix = file.canonicalPath!!.length
-    val relativePathFromResourcesPath = file.canonicalPath!!.substring(fileResourcesPathWithPrefix.length, indexOfSuffix)
-    return includeMap.getOrDefault(relativePathFromResourcesPath, IncludeProps.empty)
-  }
-
-  private class IncludeProps(val numberOfIncludes: Int, val directParents: Set<String>) {
-    val rootParents: MutableSet<String> = HashSet()
-
-    fun processRootParentsBasedOn(includeMap: HashMap<String, IncludeProps>) {
-      var dp: Set<String> = HashSet(this.directParents)
-      while (dp.isNotEmpty()) {
-        // adauga la rootParents toti directParents care nu mai au directParents
-        rootParents.addAll(dp.stream().filter { directParent: String? ->
-            includeMap.getOrDefault(
-              directParent, empty
-            ).directParents.isEmpty()
-          }.collect(Collectors.toUnmodifiableSet()))
-
-        // filtreaza directParents care au directParents si devine noul directParents pentru a se duce pe flow in sus pana ajunge la rootParents
-        dp = dp.stream().filter { directParent: String? ->
-            includeMap.getOrDefault(
-              directParent, empty
-            ).directParents.isNotEmpty()
-          }.map { directParentWithDirectParents: String? ->
-            includeMap.getOrDefault(
-              directParentWithDirectParents, empty
-            ).directParents
-          }.flatMap { obj: Set<String> -> obj.stream() }.collect(Collectors.toUnmodifiableSet())
-      }
-    }
-
-    companion object {
-      val empty: IncludeProps
-        get() = IncludeProps(0, HashSet())
-    }
-  }
 
   private fun getActiveTab(): PdfEditorViewComponent {
     return jbTabbedPane.selectedComponent as PdfEditorViewComponent

@@ -33,7 +33,11 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
         if (file.fileType == PdfFileType) {
           return PdfFileEditor(project, file)
         } else if (mainProvider.accept(project, file) && file.extension == "mustache") {
-          return MustacheFileEditor(project, createEditorBuilder(mainProvider, project, file).build() as TextEditor, PdfFileEditorWrapper(project, file));
+          return MustacheFileEditor(
+            project,
+            createEditorBuilder(mainProvider, project, file).build() as TextEditor,
+            PdfFileEditorWrapper(project, file)
+          )
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
       }
