@@ -3,7 +3,6 @@ package generate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
 import org.jsoup.Jsoup;
@@ -14,16 +13,14 @@ import org.jsoup.nodes.Entities;
 import java.awt.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
+
+import static generate.Utils.DEFAULT_SUFFIX;
 
 public class PdfGenerationService {
 
-  public static final String DEFAULT_PREFIX = "/templates/";
-  public static final String DEFAULT_SUFFIX = ".mustache";
-  public static final String JAVA_RESOURCES_FOLDER_NAME = "resources";
   static final String PDF_GENERATION_ERROR = "A apărut o problemă în momentul generării fișierului";
   static final String PDF_GENERATION_EMPTY_FILE = "Fișierul generat este gol. Te rugăm să încerci mai târziu!";
-  private static PdfGenerationService pdfGenerationService;
+  private static PdfGenerationService instance;
   final ObjectMapper objectMapper = new ObjectMapper();
   final Mustache.Compiler mustacheCompiler;
   final Logger logger = Logger.getInstance(PdfGenerationService.class);
@@ -32,24 +29,10 @@ public class PdfGenerationService {
     this.mustacheCompiler = compiler;
   }
 
-  public static String getFileResourcesPathWithPrefix(VirtualFile file) {
-    var forFileCanonicalPath = file.getCanonicalPath();
-    Objects.requireNonNull(forFileCanonicalPath);
-    var resourcesIndex = forFileCanonicalPath.indexOf(JAVA_RESOURCES_FOLDER_NAME);
-    if (resourcesIndex != -1)
-      return forFileCanonicalPath.substring(0, resourcesIndex + JAVA_RESOURCES_FOLDER_NAME.length()) + DEFAULT_PREFIX;
-    throw new RuntimeException("File is not in the resources folder of the java project!");
-  }
-
-  public static PdfGenerationService getInstance(VirtualFile forFile) {
-    var fileResourcesPathWithPrefix = getFileResourcesPathWithPrefix(forFile);
-    if (PdfGenerationService.pdfGenerationService != null) return PdfGenerationService.pdfGenerationService;
-    PdfGenerationService.pdfGenerationService = new PdfGenerationService(
-      Mustache.compiler().withLoader(name -> new FileReader(
-        new File(fileResourcesPathWithPrefix, name + DEFAULT_SUFFIX))
-      )
-    );
-    return PdfGenerationService.pdfGenerationService;
+  public static PdfGenerationService getInstance(String fileResourcesPathWithPrefix) {
+    if (PdfGenerationService.instance != null) return PdfGenerationService.instance;
+    PdfGenerationService.instance = new PdfGenerationService(Mustache.compiler().withLoader(name -> new FileReader(new File(fileResourcesPathWithPrefix, name + DEFAULT_SUFFIX))));
+    return PdfGenerationService.instance;
   }
 
   public byte[] generatePdf(Object model, String templateContent) {
@@ -97,10 +80,7 @@ public class PdfGenerationService {
 
   private Document convertHtmlToXHtml(String pdfContent) {
     var document = Jsoup.parse(pdfContent);
-    document.outputSettings()
-      .syntax(Document.OutputSettings.Syntax.xml)
-      .escapeMode(Entities.EscapeMode.xhtml)
-      .charset(StandardCharsets.UTF_8);
+    document.outputSettings().syntax(Document.OutputSettings.Syntax.xml).escapeMode(Entities.EscapeMode.xhtml).charset(StandardCharsets.UTF_8);
     return document;
   }
 

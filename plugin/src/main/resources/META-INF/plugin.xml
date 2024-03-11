@@ -14,6 +14,7 @@
               language="PDF"
               fieldName="INSTANCE"
               implementationClass="com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType"/>
+    <projectService serviceInterface="com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService" serviceImplementation="com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl"/>
     <fileEditorProvider implementation="com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProvider"/>
     <httpRequestHandler implementation="com.firsttimeinforever.intellij.pdf.viewer.jcef.PdfStaticServer"/>
 

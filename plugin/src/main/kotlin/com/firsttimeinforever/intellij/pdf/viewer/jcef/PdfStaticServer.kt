@@ -22,7 +22,6 @@ import kotlin.random.Random
 
 internal class PdfStaticServer : HttpRequestHandler() {
   private val serverUrl = "http://localhost:${BuiltInServerManager.getInstance().port}/$uuid"
-  // HERE
 
   init {
     logger.debug("Starting static server with url: $serverUrl")
