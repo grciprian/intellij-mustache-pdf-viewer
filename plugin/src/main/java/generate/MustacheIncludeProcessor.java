@@ -8,12 +8,13 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static generate.Utils.*;
-
+import static generate.Utils.FILE_RESOURCES_PATH_WITH_PREFIX;
+import static generate.Utils.getRelativePathFromResourcePathWithPrefix;
 
 public class MustacheIncludeProcessor {
 
   private static MustacheIncludeProcessor instance;
+  private final Map<String, VirtualFile> rootVirtualFileMap = new HashMap<>();
   private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
 
   private MustacheIncludeProcessor() {
@@ -29,6 +30,7 @@ public class MustacheIncludeProcessor {
 
   public void processFileIncludePropsMap() {
     includePropsMap.clear();
+    rootVirtualFileMap.clear();
     var root = VfsUtil.findFile(Path.of(FILE_RESOURCES_PATH_WITH_PREFIX), true);
     Objects.requireNonNull(root, "Root folder FILE_RESOURCES_PATH_WITH_PREFIX " + FILE_RESOURCES_PATH_WITH_PREFIX + " not found!");
     // TODO alta tratare daca nu e gasit root resources with prefix?
@@ -54,13 +56,15 @@ public class MustacheIncludeProcessor {
       return true;
     });
 
-    //process and filter main directParents into rootParents
+    //process and filter main directParents into roots
     includePropsMap.values().forEach(includeProps -> includeProps.processRootParentsBasedOn(includePropsMap));
 
-    //orice includeProp daca nu are rootParents atunci este rootParent si il adaugam ca atare
+    //orice includeProp daca nu are roots atunci este root si il adaugam ca atare
+    //de asemenea se populeaza rootVirtualFileMap
     includePropsMap.forEach((name, includeProps) -> {
-      if (includeProps.rootParents.isEmpty()) {
-        includeProps.rootParents.add(new RootParent(name));
+      if (includeProps.roots.isEmpty()) {
+        includeProps.roots.add(name);
+        rootVirtualFileMap.put(name, null);
       }
     });
   }
@@ -74,17 +78,13 @@ public class MustacheIncludeProcessor {
     return includePropsMap.entrySet().stream().filter(e -> e.getKey().equals(relativePathFromResourcePathWithPrefix)).findAny();
   }
 
-  public Map<String, IncludeProps> getIncludePropsMap() {
-    return includePropsMap;
-  }
-
-  public Set<String> getRoots() {
-    return includePropsMap.entrySet().stream().filter(stringIncludePropsEntry -> stringIncludePropsEntry.getValue().getRootParents().isEmpty()).map(Map.Entry::getKey).collect(Collectors.toSet());
+  public Map<String, VirtualFile> getRootVirtualFileMap() {
+    return rootVirtualFileMap;
   }
 
   public static class IncludeProps {
     private final Set<String> directParents;
-    private final Set<RootParent> rootParents = new HashSet<>();
+    private final Set<String> roots = new HashSet<>();
 
     IncludeProps(Set<String> directParents) {
       this.directParents = directParents;
@@ -94,49 +94,19 @@ public class MustacheIncludeProcessor {
       return new IncludeProps(new HashSet<>());
     }
 
-    public Set<RootParent> getRootParents() {
-      return rootParents;
-    }
-
-    public Set<String> getRootParentsNames() {
-      return rootParents.stream().map(RootParent::getSimpleFilename).collect(Collectors.toSet());
+    public Set<String> getRoots() {
+      return roots;
     }
 
     public void processRootParentsBasedOn(Map<String, IncludeProps> includeMap) {
       Set<String> dp = new HashSet<>(this.directParents);
       while (!dp.isEmpty()) {
         // adauga la rootParents toti directParents care nu mai au directParents
-        this.rootParents.addAll(dp.stream().filter(directParent -> includeMap.getOrDefault(directParent, IncludeProps.getEmpty()).directParents.isEmpty()).map(RootParent::new).collect(Collectors.toUnmodifiableSet()));
+        this.roots.addAll(dp.stream().filter(directParent -> includeMap.getOrDefault(directParent, IncludeProps.getEmpty()).directParents.isEmpty()).collect(Collectors.toUnmodifiableSet()));
 
         // filtreaza directParents care au directParents si devine noul directParents pentru a se duce pe flow in sus pana ajunge la rootParents
         dp = dp.stream().filter(directParent -> !includeMap.getOrDefault(directParent, IncludeProps.getEmpty()).directParents.isEmpty()).map(directParentWithDirectParents -> includeMap.getOrDefault(directParentWithDirectParents, IncludeProps.getEmpty()).directParents).flatMap(Set::stream).collect(Collectors.toUnmodifiableSet());
       }
     }
   }
-
-  public static class RootParent {
-    private final String simpleFilename;
-    private VirtualFile attachedPdf;
-
-    RootParent(String simpleFilename) {
-      this.simpleFilename = simpleFilename;
-    }
-
-    public String getSimpleFilename() {
-      return simpleFilename;
-    }
-
-    public String getCanonicalPath() {
-      return FILE_RESOURCES_PATH_WITH_PREFIX + simpleFilename + DEFAULT_SUFFIX;
-    }
-
-    public VirtualFile getAttachedPdf() {
-      return attachedPdf;
-    }
-
-    public void setAttachedPdf(VirtualFile attachedPdf) {
-      this.attachedPdf = attachedPdf;
-    }
-  }
-
 }

@@ -37,30 +37,9 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
           return PdfFileEditor(project, virtualFile)
         } else if (mainProvider.accept(project, virtualFile) && virtualFile.extension == "mustache") {
           FILE_RESOURCES_PATH_WITH_PREFIX = getFileResourcesPathWithPrefix(project, virtualFile)
-//          val myService = ProjectManager.getInstance().defaultProject.getService(MustacheContextService::class.java)
-//          project.messageBus.syncPublisher(MustacheContextService.TOPIC).editorLoaded(virtualFile)
-          return MustacheFileEditor(
-            project,
-            createEditorBuilder(mainProvider, project, virtualFile).build() as TextEditor,
-            PdfFileEditorWrapper(project, virtualFile)
-          )
+          return MustacheFileEditor(project, virtualFile).getEditor()
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
-      }
-    }
-  }
-
-  private fun createEditorBuilder(
-    provider: FileEditorProvider, project: Project, file: VirtualFile
-  ): AsyncFileEditorProvider.Builder {
-    if (provider is AsyncFileEditorProvider) {
-      return runBlockingCancellable {
-        provider.createEditorAsync(project, file)
-      }
-    }
-    return object : AsyncFileEditorProvider.Builder() {
-      override fun build(): FileEditor {
-        return provider.createEditor(project, file)
       }
     }
   }

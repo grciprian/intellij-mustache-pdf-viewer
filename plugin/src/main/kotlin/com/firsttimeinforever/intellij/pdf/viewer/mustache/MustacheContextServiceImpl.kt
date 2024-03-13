@@ -16,7 +16,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   private val mustacheIncludeProcessor: MustacheIncludeProcessor = MustacheIncludeProcessor.getInstance()
 
   init {
-    println(project.name + "ASACEVA")
+    println("MustacheContextServiceImpl initialized for " + project.name)
 //    messageBusConnection.subscribe(TOPIC, MustacheContextListener {
 //      println(project.name)
 //      println(it.canonicalPath)

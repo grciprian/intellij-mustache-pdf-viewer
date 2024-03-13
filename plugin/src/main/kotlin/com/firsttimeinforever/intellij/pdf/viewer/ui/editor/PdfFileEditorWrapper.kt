@@ -10,8 +10,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
-import generate.MustacheIncludeProcessor.RootParent
 import generate.Utils.getProcessedPdfFile
+import java.util.Objects
 import javax.swing.JComponent
 
 class PdfFileEditorWrapper(
@@ -20,13 +20,13 @@ class PdfFileEditorWrapper(
   private val messageBusConnection = project.messageBus.connect()
   private val jbTabbedPane = JBTabbedPane()
   private val mustacheContextService = project.service<MustacheContextService>()
+  private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
 
   init {
     Disposer.register(this, messageBusConnection)
-    val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
 
     mustacheIncludeProcessor.getFileIncludePropsForFile(virtualFile).ifPresentOrElse({
-        it.value.rootParents.forEach { rootParent -> addPdfFileEditorTab(rootParent) }
+        it.value.roots.forEach { rootName -> addPdfFileEditorTab(rootName) }
       }, { throw RuntimeException("Include map corrupted for " + virtualFile.canonicalPath) })
 
 //    messageBusConnection.subscribe(MustacheFileEditor.MUSTACHE_FILE_LISTENER_TOPIC, MustacheFileEditor.MustacheFileListener {
@@ -49,14 +49,15 @@ class PdfFileEditorWrapper(
 //    }
   }
 
-  private fun addPdfFileEditorTab(rootParent: RootParent) {
-    var processedPdfFile = rootParent.attachedPdf
+  private fun addPdfFileEditorTab(rootName: String) {
+    var processedPdfFile = mustacheIncludeProcessor.rootVirtualFileMap[rootName]
     if (processedPdfFile == null) {
-      processedPdfFile = getProcessedPdfFile(rootParent.simpleFilename)
-      rootParent.attachedPdf = processedPdfFile
+      processedPdfFile = getProcessedPdfFile(rootName)
+      mustacheIncludeProcessor.rootVirtualFileMap[rootName] = processedPdfFile
     }
-    val editor = PdfFileEditor(project, processedPdfFile)
-    jbTabbedPane.insertTab(rootParent.simpleFilename, null, editor.component, null, 0)
+    Objects.requireNonNull(processedPdfFile, "Could not get processedPdfFile!")
+    val editor = PdfFileEditor(project, processedPdfFile!!)
+    jbTabbedPane.insertTab(rootName, null, editor.component, null, 0)
   }
 
   override fun getComponent(): JComponent = jbTabbedPane

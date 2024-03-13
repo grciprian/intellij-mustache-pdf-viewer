@@ -40,9 +40,9 @@ class PdfFileEditor(project: Project, private var virtualFile: VirtualFile) : Fi
     // subscribes to changes directly from a mustache file to reload all previews that depend on it
     messageBusConnection.subscribe(MustacheFileEditor.MUSTACHE_FILE_LISTENER_TOPIC, MustacheFileEditor.MustacheFileListener {
       val source = mutableSetOf(it.key)
-      source.addAll(it.value.rootParentsNames)
+      source.addAll(it.value.roots)
       val target = mutableSetOf(fileIncludePropsEntry?.key)
-      target.addAll(fileIncludePropsEntry?.value?.rootParentsNames!!)
+      target.addAll(fileIncludePropsEntry?.value?.roots!!)
 
       // update fileIncludePropsEntry with maybe modified ones
       fileIncludePropsEntry = it
