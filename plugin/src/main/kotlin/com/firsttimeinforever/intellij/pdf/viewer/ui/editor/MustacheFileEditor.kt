@@ -19,7 +19,6 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.messages.Topic
-import generate.MustacheIncludeProcessor
 import generate.Utils.FILE_RESOURCES_PATH_WITH_PREFIX
 import generate.Utils.getProcessedPdfFile
 import org.jetbrains.annotations.NotNull
@@ -48,7 +47,6 @@ class MustacheFileEditor(
 
   private inner class FileEditorChangedListener : BulkFileListener {
     override fun after(events: MutableList<out VFileEvent>) {
-//      val initialRootParents = mustacheIncludeProcessor.roots.toSet()
       // processFileIncludePropsMap after any files modification under resources folder
       if (events.any { it.file?.canonicalPath?.indexOf(FILE_RESOURCES_PATH_WITH_PREFIX, 0, false) == 0 }) {
         mustacheIncludeProcessor.processFileIncludePropsMap()
@@ -57,17 +55,16 @@ class MustacheFileEditor(
       // and announce the correspondent PdfFileEditor to reload
       if (events.any { it.file == editor.file }) {
         logger.debug("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
-//        val keyProcessedPdfFileMap = HashMap<String, VirtualFile>()
-        val fileIncludePropsEntry = mustacheIncludeProcessor.getFileIncludePropsForFile(editor.file)
+        val fileRoots = mustacheIncludeProcessor.getRootsForFile(editor.file)
           .orElseThrow { RuntimeException("Include map corrupted for " + editor.file.canonicalPath) }
 
-//        fileIncludePropsEntry.value.rootParents.forEach {
-//          val processedPdfFile = getProcessedPdfFile(it.name)
-//          keyProcessedPdfFileMap[it.name] = processedPdfFile
-//        }
+        fileRoots.forEach {
+          val processedPdfFile = getProcessedPdfFile(it)
+          mustacheIncludeProcessor.setRootVirtualFile(it, processedPdfFile)
+        }
 
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_TOPIC)
-          .mustacheFileContentChanged(fileIncludePropsEntry)
+          .mustacheFileContentChanged(fileRoots)
       }
     }
   }
@@ -77,7 +74,7 @@ class MustacheFileEditor(
   }
 
   fun interface MustacheFileListener {
-    fun mustacheFileContentChanged(fileIncludePropsEntry: Map.Entry<String, MustacheIncludeProcessor.IncludeProps>)
+    fun mustacheFileContentChanged(fileRoots: Set<String>)
   }
 
   private fun createEditorBuilder(): AsyncFileEditorProvider.Builder {

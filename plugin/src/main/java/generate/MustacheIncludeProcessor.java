@@ -69,17 +69,28 @@ public class MustacheIncludeProcessor {
     });
   }
 
-  public Optional<Map.Entry<String, IncludeProps>> getFileIncludePropsForFile(VirtualFile virtualFile) {
-    return getFileIncludePropsForFile(virtualFile.getCanonicalPath());
+  public Map<String, MustacheIncludeProcessor.IncludeProps> getIncludePropsMap() {
+    return Map.copyOf(includePropsMap);
   }
 
-  public Optional<Map.Entry<String, IncludeProps>> getFileIncludePropsForFile(String canonicalPath) {
+  public Optional<Set<String>> getRootsForFile(VirtualFile virtualFile) {
+    return getRootsForFile(virtualFile.getCanonicalPath());
+  }
+
+  public Optional<Set<String>> getRootsForFile(String canonicalPath) {
     var relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(canonicalPath);
-    return includePropsMap.entrySet().stream().filter(e -> e.getKey().equals(relativePathFromResourcePathWithPrefix)).findAny();
+    return includePropsMap.entrySet().stream()
+      .filter(e -> e.getKey().equals(relativePathFromResourcePathWithPrefix))
+      .findAny()
+      .map(v -> v.getValue().getRoots().stream().collect(Collectors.toUnmodifiableSet()));
   }
 
   public Map<String, VirtualFile> getRootVirtualFileMap() {
     return rootVirtualFileMap;
+  }
+
+  public void setRootVirtualFile(String name, VirtualFile virtualFile) {
+    rootVirtualFileMap.put(name, virtualFile);
   }
 
   public static class IncludeProps {
