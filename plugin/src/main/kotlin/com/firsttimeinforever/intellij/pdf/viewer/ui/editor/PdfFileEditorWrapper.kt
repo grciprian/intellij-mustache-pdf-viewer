@@ -1,6 +1,5 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
-import ai.grazie.utils.toLinkedSet
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
@@ -12,7 +11,6 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
 import generate.Utils.getProcessedPdfFile
-import generate.Utils.getRelativePathFromResourcePathWithPrefix
 import java.util.*
 import javax.swing.JComponent
 
@@ -25,46 +23,41 @@ class PdfFileEditorWrapper(
   private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
   private var fileRoots: Set<String> = mustacheIncludeProcessor.getRootsForFile(virtualFile)
     .orElseThrow { RuntimeException("Include map corrupted for " + virtualFile.canonicalPath) }
+  private val tabRootAware = mutableListOf<String>()
+  private val ADD_INDEX_FOR_NEW_TAB = 0
 
   init {
     Disposer.register(this, messageBusConnection)
-    fileRoots.forEach {
-      addPdfFileEditorTab(it)
-    }
+    fileRoots.forEach { addPdfFileEditorTab(it) }
 
-    messageBusConnection.subscribe(
-      MustacheFileEditor.MUSTACHE_FILE_LISTENER_TOPIC,
-      MustacheFileEditor.MustacheFileListener { modifiedFileRoots ->
-//        val relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(virtualFile)
-//        val oldRoots = includePropsMap[relativePathFromResourcePathWithPrefix]!!.roots
+    messageBusConnection.subscribe(MustacheFileEditor.MUSTACHE_FILE_LISTENER_TOPIC, MustacheFileEditor.MustacheFileListener {
+      // if source fileRoots intersects this PdfFileEditor target fileRoots
+      // then the mustache file that was modified impacted
+      val rootsIntersection = it.intersect(fileRoots)
+      if (rootsIntersection.isEmpty()) return@MustacheFileListener
 
-        val tabRoots = (0 until jbTabbedPane.tabCount).asSequence()
-          .map {
-            val pdfEditorViewComponent = jbTabbedPane.getComponentAt(it) as PdfEditorViewComponent
-            getRelativePathFromResourcePathWithPrefix(pdfEditorViewComponent.virtualFile)
+      // remove roots not needed anymore
+      // fml
+      var i = 0
+      while (i < tabRootAware.size) {
+        if (!it.contains(tabRootAware.elementAt(i))) {
+          println("removing " + tabRootAware.elementAt(i))
+          jbTabbedPane.remove(i)
+          tabRootAware.removeAt(i)
+          if (i - 1 >= 0) {
+            i -= 1
           }
-          .toLinkedSet()
-        var i = 0
-        var tabRootsSize = tabRoots.size
-        while (i < tabRootsSize) {
-          if (!modifiedFileRoots.contains(tabRoots.elementAt(i))) {
-            jbTabbedPane.remove(i)
-            if (i - 1 >= 0) {
-              i -= 1
-              tabRootsSize--
-            }
-            println("removed " + tabRoots.elementAt(i))
-          }
-          ++i
         }
+        ++i
+      }
 
-        // add new identified root files
-        modifiedFileRoots.subtract(tabRoots.toSet()).forEach {
-          addPdfFileEditorTab(it)
-        }
+      // update fileRoots with maybe modified ones
+      fileRoots = it
 
-        fileRoots = modifiedFileRoots
-      })
+      // add new identified root files
+      it.subtract(tabRootAware.toSet())
+        .forEach { rootName -> addPdfFileEditorTab(rootName) }
+    })
 
 //    jbTabbedPane.addChangeListener {
 //      val sourceTabbedPane = it.source as JBTabbedPane
@@ -86,7 +79,8 @@ class PdfFileEditorWrapper(
     }
     Objects.requireNonNull(processedPdfFile, "Could not get processedPdfFile!")
     val editor = PdfFileEditor(project, processedPdfFile!!, fileRoots)
-    jbTabbedPane.insertTab(rootName, null, editor.component, null, 0)
+    jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
+    tabRootAware.add(ADD_INDEX_FOR_NEW_TAB, rootName)
   }
 
   override fun getComponent(): JComponent = jbTabbedPane

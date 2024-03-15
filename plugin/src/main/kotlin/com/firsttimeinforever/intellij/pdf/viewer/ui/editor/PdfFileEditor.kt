@@ -42,7 +42,7 @@ class PdfFileEditor(project: Project, private var virtualFile: VirtualFile) : Fi
       // then the mustache file that was modified impacted the pdf and it needs to be reloaded
       if (fileRoots != null && it.intersect(fileRoots!!).isEmpty()) return@MustacheFileListener
 
-      // update fileIncludePropsEntry with maybe modified ones
+      // update fileRoots with maybe modified ones
       fileRoots = it
 
       if (viewComponent.controller == null) {
