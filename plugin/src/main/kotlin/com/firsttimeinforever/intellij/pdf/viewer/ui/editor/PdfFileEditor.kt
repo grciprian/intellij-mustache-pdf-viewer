@@ -1,11 +1,13 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.structureView.PdfStructureViewBuilder
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
 import com.intellij.ide.structureView.StructureViewBuilder
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -17,17 +19,12 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import javax.swing.JComponent
 
 // TODO: Implement state persistence
-class PdfFileEditor(project: Project, private var virtualFile: VirtualFile) : FileEditorBase(), DumbAware {
-  var viewComponent = PdfEditorViewComponent(project, virtualFile)
-  private var fileRoots: Set<String>? = null
+class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEditorBase(), DumbAware {
+  val viewComponent = PdfEditorViewComponent(project, pdfFile)
   private val messageBusConnection = project.messageBus.connect()
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
-
-  constructor(
-    project: Project, virtualFile: VirtualFile, fileRoots: Set<String>
-  ) : this(project, virtualFile) {
-    this.fileRoots = fileRoots
-  }
+  private val mustacheContextService = project.service<MustacheContextService>()
+  private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
 
   init {
     Disposer.register(this, viewComponent)
@@ -37,26 +34,24 @@ class PdfFileEditor(project: Project, private var virtualFile: VirtualFile) : Fi
       fileChangedListener.isEnabled = it.enableDocumentAutoReload
     })
     // subscribes to changes directly from a mustache file to reload all previews that depend on it
-    messageBusConnection.subscribe(MustacheFileEditor.MUSTACHE_FILE_LISTENER_TOPIC, MustacheFileEditor.MustacheFileListener {
+    messageBusConnection.subscribe(MustacheFileEditor.MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC, MustacheFileEditor.MustacheFileListenerSecondStep {
       // if source fileRoots intersects this PdfFileEditor target fileRoots
       // then the mustache file that was modified impacted the pdf and it needs to be reloaded
-      if (fileRoots != null && it.intersect(fileRoots!!).isEmpty()) return@MustacheFileListener
-
-      // update fileRoots with maybe modified ones
-      fileRoots = it
+      val pdfFileRoot = mustacheIncludeProcessor.getRootForPdfFile(pdfFile)
+      if (!it.contains(pdfFileRoot)) return@MustacheFileListenerSecondStep
 
       if (viewComponent.controller == null) {
         logger.warn("FileChangedListener was called for view with controller == null!")
       } else {
-        logger.debug("Target file ${virtualFile.path} changed. Reloading current view.")
-        viewComponent.controller?.reload(tryToPreserveState = true)
+        logger.debug("Target file ${pdfFile.path} changed. Reloading current view.")
+        viewComponent.controller.reload(tryToPreserveState = true)
       }
     })
   }
 
   override fun getName(): String = NAME
 
-  override fun getFile(): VirtualFile = virtualFile
+  override fun getFile(): VirtualFile = pdfFile
 
   override fun getComponent(): JComponent = viewComponent
 
@@ -70,9 +65,9 @@ class PdfFileEditor(project: Project, private var virtualFile: VirtualFile) : Fi
       }
       if (viewComponent.controller == null) {
         logger.warn("FileChangedListener was called for view with controller == null!")
-      } else if (events.any { it.file == virtualFile }) {
-        logger.debug("Target file ${virtualFile.path} changed. Reloading current view.")
-        viewComponent.controller?.reload(tryToPreserveState = true)
+      } else if (events.any { it.file == pdfFile }) {
+        logger.debug("Target file ${pdfFile.path} changed. Reloading current view.")
+        viewComponent.controller.reload(tryToPreserveState = true)
       }
     }
   }

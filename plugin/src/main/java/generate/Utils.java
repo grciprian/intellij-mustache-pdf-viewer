@@ -41,7 +41,7 @@ public class Utils {
     return canonicalPath.substring(FILE_RESOURCES_PATH_WITH_PREFIX.length(), indexOfSuffix);
   }
 
-  public static VirtualFile getProcessedPdfFile(String simpleFilename) {
+  public static VirtualFile getPdfFile(String simpleFilename) {
     try {
       var path = Path.of(FILE_RESOURCES_PATH_WITH_PREFIX + simpleFilename + DEFAULT_SUFFIX);
       var virtualFile = VfsUtil.findFile(path, true);

@@ -8,13 +8,12 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static generate.Utils.FILE_RESOURCES_PATH_WITH_PREFIX;
-import static generate.Utils.getRelativePathFromResourcePathWithPrefix;
+import static generate.Utils.*;
 
 public class MustacheIncludeProcessor {
 
   private static MustacheIncludeProcessor instance;
-  private final Map<String, VirtualFile> rootVirtualFileMap = new HashMap<>();
+  private final Map<String, VirtualFile> rootPdfFileMap = new HashMap<>();
   private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
 
   private MustacheIncludeProcessor() {
@@ -30,7 +29,6 @@ public class MustacheIncludeProcessor {
 
   public void processFileIncludePropsMap() {
     includePropsMap.clear();
-    rootVirtualFileMap.clear();
     var root = VfsUtil.findFile(Path.of(FILE_RESOURCES_PATH_WITH_PREFIX), true);
     Objects.requireNonNull(root, "Root folder FILE_RESOURCES_PATH_WITH_PREFIX " + FILE_RESOURCES_PATH_WITH_PREFIX + " not found!");
     // TODO alta tratare daca nu e gasit root resources with prefix?
@@ -60,37 +58,64 @@ public class MustacheIncludeProcessor {
     includePropsMap.values().forEach(includeProps -> includeProps.processRootParentsBasedOn(includePropsMap));
 
     //orice includeProp daca nu are roots atunci este root si il adaugam ca atare
-    //de asemenea se populeaza rootVirtualFileMap
+    //de asemenea se actualizeaza rootPdfFileMap
+    var newRootPdfFileMap = new HashMap<String, VirtualFile>();
     includePropsMap.forEach((name, includeProps) -> {
       if (includeProps.roots.isEmpty()) {
         includeProps.roots.add(name);
-        rootVirtualFileMap.put(name, null);
+        rootPdfFileMap.put(name, null);
+        newRootPdfFileMap.put(name, null);
       }
     });
+    //clean expired roots
+    rootPdfFileMap.keySet().stream()
+      .filter(rootName -> !newRootPdfFileMap.containsKey(rootName))
+      .forEach(rootPdfFileMap::remove);
   }
 
   public Map<String, MustacheIncludeProcessor.IncludeProps> getIncludePropsMap() {
     return Map.copyOf(includePropsMap);
   }
 
-  public Optional<Set<String>> getRootsForFile(VirtualFile virtualFile) {
-    return getRootsForFile(virtualFile.getCanonicalPath());
+  public Set<String> getRootsForMustacheFile(VirtualFile mustacheFile) {
+    return getRootsForMustacheFile(mustacheFile.getCanonicalPath());
   }
 
-  public Optional<Set<String>> getRootsForFile(String canonicalPath) {
-    var relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(canonicalPath);
+  public Set<String> getRootsForMustacheFile(String mustacheFileCanonicalPath) {
+    var relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(mustacheFileCanonicalPath);
     return includePropsMap.entrySet().stream()
-      .filter(e -> e.getKey().equals(relativePathFromResourcePathWithPrefix))
+      .filter(e -> e.getKey().equals(relativePathFromResourcePathWithPrefix)).findAny()
+      .map(v -> v.getValue().getRoots().stream().collect(Collectors.toUnmodifiableSet()))
+      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + mustacheFileCanonicalPath));
+  }
+
+  public Map<String, VirtualFile> getRootPdfFileMap() {
+    return Map.copyOf(rootPdfFileMap);
+  }
+
+  public VirtualFile processRootPdfFile(String rootName) {
+    if (rootPdfFileMap.get(rootName) == null) {
+      var pdfFile = getPdfFile(rootName);
+      rootPdfFileMap.values().stream()
+        .filter(Objects::nonNull)
+        .map(VirtualFile::getCanonicalPath)
+        .filter(Objects::nonNull)
+        .filter(path -> path.equals(pdfFile.getCanonicalPath())).findAny()
+        .ifPresent(v -> {
+          throw new RuntimeException("The pair must be unique but isn't!? It should only be contained by a single root: " + v);
+        });
+      rootPdfFileMap.put(rootName, pdfFile);
+    }
+    return rootPdfFileMap.get(rootName);
+  }
+
+  public String getRootForPdfFile(VirtualFile pdfFile) {
+    return rootPdfFileMap.entrySet().stream()
+      .filter(entry -> entry.getValue() != null)
+      .filter(entry -> Objects.equals(entry.getValue().getCanonicalPath(), pdfFile.getCanonicalPath()))
       .findAny()
-      .map(v -> v.getValue().getRoots().stream().collect(Collectors.toUnmodifiableSet()));
-  }
-
-  public Map<String, VirtualFile> getRootVirtualFileMap() {
-    return rootVirtualFileMap;
-  }
-
-  public void setRootVirtualFile(String name, VirtualFile virtualFile) {
-    rootVirtualFileMap.put(name, virtualFile);
+      .map(Map.Entry::getKey)
+      .orElseThrow(() -> new RuntimeException("No root key found for pdfFile with canonical path: " + pdfFile.getCanonicalPath()));
   }
 
   public static class IncludeProps {

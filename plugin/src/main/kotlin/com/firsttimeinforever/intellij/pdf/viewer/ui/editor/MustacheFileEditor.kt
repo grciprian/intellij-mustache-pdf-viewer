@@ -19,8 +19,9 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.messages.Topic
+//import com.intellij.util.messages.Topic
 import generate.Utils.FILE_RESOURCES_PATH_WITH_PREFIX
-import generate.Utils.getProcessedPdfFile
+//import generate.Utils.getProcessedPdfFile
 import org.jetbrains.annotations.NotNull
 
 class MustacheFileEditor(
@@ -55,16 +56,11 @@ class MustacheFileEditor(
       // and announce the correspondent PdfFileEditor to reload
       if (events.any { it.file == editor.file }) {
         logger.debug("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
-        val fileRoots = mustacheIncludeProcessor.getRootsForFile(editor.file)
-          .orElseThrow { RuntimeException("Include map corrupted for " + editor.file.canonicalPath) }
-
-        fileRoots.forEach {
-          val processedPdfFile = getProcessedPdfFile(it)
-          mustacheIncludeProcessor.setRootVirtualFile(it, processedPdfFile)
-        }
-
-        ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_TOPIC)
-          .mustacheFileContentChanged(fileRoots)
+        val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file);
+        ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
+          .mustacheFileContentChangedSecondStep(updatedMustacheFileRoots)
+        ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
+          .mustacheFileContentChangedSecondStep(updatedMustacheFileRoots)
       }
     }
   }
@@ -73,8 +69,12 @@ class MustacheFileEditor(
     return textEditorWithPreview
   }
 
-  fun interface MustacheFileListener {
-    fun mustacheFileContentChanged(fileRoots: Set<String>)
+  fun interface MustacheFileListenerFirstStep {
+    fun mustacheFileContentChangedFirstStep(updatedMustacheFileRoots: Set<String>)
+  }
+
+  fun interface MustacheFileListenerSecondStep {
+    fun mustacheFileContentChangedSecondStep(updatedMustacheFileRoots: Set<String>)
   }
 
   private fun createEditorBuilder(): AsyncFileEditorProvider.Builder {
@@ -91,7 +91,8 @@ class MustacheFileEditor(
   }
 
   companion object {
-    val MUSTACHE_FILE_LISTENER_TOPIC = Topic(MustacheFileListener::class.java)
+    val MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC = Topic(MustacheFileListenerSecondStep::class.java)
+    val MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC = Topic(MustacheFileListenerSecondStep::class.java)
     private const val NAME = "Mustache Viewer File Editor With Preview"
     private val logger = logger<MustacheFileEditor>()
   }
