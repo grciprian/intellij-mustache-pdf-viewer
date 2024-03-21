@@ -58,7 +58,7 @@ class MustacheFileEditor(
         logger.debug("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
         val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file);
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
-          .mustacheFileContentChangedSecondStep(updatedMustacheFileRoots)
+          .mustacheFileContentChangedFirstStep(updatedMustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
           .mustacheFileContentChangedSecondStep(updatedMustacheFileRoots)
       }
@@ -91,7 +91,7 @@ class MustacheFileEditor(
   }
 
   companion object {
-    val MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC = Topic(MustacheFileListenerSecondStep::class.java)
+    val MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC = Topic(MustacheFileListenerFirstStep::class.java)
     val MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC = Topic(MustacheFileListenerSecondStep::class.java)
     private const val NAME = "Mustache Viewer File Editor With Preview"
     private val logger = logger<MustacheFileEditor>()

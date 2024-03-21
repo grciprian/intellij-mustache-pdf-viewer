@@ -26,9 +26,11 @@ class PdfFileEditorWrapper(
     Disposer.register(this, messageBusConnection)
     fileRoots.forEach { addPdfFileEditorTab(it) }
 
-    messageBusConnection.subscribe(MustacheFileEditor.MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC, MustacheFileEditor.MustacheFileListenerSecondStep {
-      tryUpdateTabbedPane(it)
-    })
+    messageBusConnection.subscribe(
+      MustacheFileEditor.MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC,
+      MustacheFileEditor.MustacheFileListenerFirstStep {
+        tryUpdateTabbedPane(it)
+      })
 
     // reload on tab change? but now is implemented to load all even if not in focus
 //    jbTabbedPane.addChangeListener {

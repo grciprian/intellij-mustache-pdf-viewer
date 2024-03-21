@@ -58,12 +58,14 @@ public class MustacheIncludeProcessor {
     includePropsMap.values().forEach(includeProps -> includeProps.processRootParentsBasedOn(includePropsMap));
 
     //orice includeProp daca nu are roots atunci este root si il adaugam ca atare
-    //de asemenea se actualizeaza rootPdfFileMap
     var newRootPdfFileMap = new HashMap<String, VirtualFile>();
     includePropsMap.forEach((name, includeProps) -> {
       if (includeProps.roots.isEmpty()) {
         includeProps.roots.add(name);
-        rootPdfFileMap.put(name, null);
+        //de asemenea se actualizeaza rootPdfFileMap
+        if(!rootPdfFileMap.containsKey(name)) {
+          rootPdfFileMap.put(name, null);
+        }
         newRootPdfFileMap.put(name, null);
       }
     });
@@ -73,9 +75,9 @@ public class MustacheIncludeProcessor {
       .forEach(rootPdfFileMap::remove);
   }
 
-  public Map<String, MustacheIncludeProcessor.IncludeProps> getIncludePropsMap() {
-    return Map.copyOf(includePropsMap);
-  }
+//  public Map<String, MustacheIncludeProcessor.IncludeProps> getIncludePropsMap() {
+//    return Map.copyOf(includePropsMap);
+//  }
 
   public Set<String> getRootsForMustacheFile(VirtualFile mustacheFile) {
     return getRootsForMustacheFile(mustacheFile.getCanonicalPath());
@@ -85,17 +87,18 @@ public class MustacheIncludeProcessor {
     var relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(mustacheFileCanonicalPath);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePathFromResourcePathWithPrefix)).findAny()
-      .map(v -> v.getValue().getRoots().stream().collect(Collectors.toUnmodifiableSet()))
+      .map(v -> v.getValue().getRoots())
       .orElseThrow(() -> new RuntimeException("Include map corrupted for " + mustacheFileCanonicalPath));
   }
 
-  public Map<String, VirtualFile> getRootPdfFileMap() {
-    return Map.copyOf(rootPdfFileMap);
-  }
+//  public Map<String, VirtualFile> getRootPdfFileMap() {
+//    return Map.copyOf(rootPdfFileMap);
+//  }
 
   public VirtualFile processRootPdfFile(String rootName) {
-    if (rootPdfFileMap.get(rootName) == null) {
+//    if (rootPdfFileMap.get(rootName) == null) {
       var pdfFile = getPdfFile(rootName);
+      // check pair rootName <--> pdfFile uniqueness
       rootPdfFileMap.values().stream()
         .filter(Objects::nonNull)
         .map(VirtualFile::getCanonicalPath)
@@ -105,8 +108,8 @@ public class MustacheIncludeProcessor {
           throw new RuntimeException("The pair must be unique but isn't!? It should only be contained by a single root: " + v);
         });
       rootPdfFileMap.put(rootName, pdfFile);
-    }
-    return rootPdfFileMap.get(rootName);
+//    }
+    return rootPdfFileMap.get(rootName); // same as pdfFile
   }
 
   public String getRootForPdfFile(VirtualFile pdfFile) {
@@ -131,7 +134,7 @@ public class MustacheIncludeProcessor {
     }
 
     public Set<String> getRoots() {
-      return roots;
+      return roots.stream().collect(Collectors.toUnmodifiableSet());
     }
 
     public void processRootParentsBasedOn(Map<String, IncludeProps> includeMap) {
