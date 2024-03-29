@@ -13,7 +13,7 @@ import static generate.Utils.*;
 public class MustacheIncludeProcessor {
 
   private static MustacheIncludeProcessor instance;
-  private final Map<String, VirtualFile> rootPdfFileMap = new HashMap<>();
+  private final Map<String, PdfFileExpirationWrapper> rootPdfFileMap = new HashMap<>();
   private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
 
   private MustacheIncludeProcessor() {
@@ -96,29 +96,43 @@ public class MustacheIncludeProcessor {
 //  }
 
   public VirtualFile processRootPdfFile(String rootName) {
-//    if (rootPdfFileMap.get(rootName) == null) {
+    if (Optional.ofNullable(rootPdfFileMap.get(rootName)).map(v -> v.expired).orElse(true)) {
       var pdfFile = getPdfFile(rootName);
       // check pair rootName <--> pdfFile uniqueness
       rootPdfFileMap.values().stream()
         .filter(Objects::nonNull)
+        .map(PdfFileExpirationWrapper::getPdfFile)
         .map(VirtualFile::getCanonicalPath)
         .filter(Objects::nonNull)
         .filter(path -> path.equals(pdfFile.getCanonicalPath())).findAny()
         .ifPresent(v -> {
           throw new RuntimeException("The pair must be unique but isn't!? It should only be contained by a single root: " + v);
         });
-      rootPdfFileMap.put(rootName, pdfFile);
-//    }
-    return rootPdfFileMap.get(rootName); // same as pdfFile
+      rootPdfFileMap.put(rootName, new PdfFileExpirationWrapper(pdfFile));
+    }
+    return rootPdfFileMap.get(rootName).pdfFile; // same as pdfFile
   }
 
   public String getRootForPdfFile(VirtualFile pdfFile) {
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
-      .filter(entry -> Objects.equals(entry.getValue().getCanonicalPath(), pdfFile.getCanonicalPath()))
+      .filter(entry -> Objects.equals(entry.getValue().pdfFile.getCanonicalPath(), pdfFile.getCanonicalPath()))
       .findAny()
       .map(Map.Entry::getKey)
       .orElseThrow(() -> new RuntimeException("No root key found for pdfFile with canonical path: " + pdfFile.getCanonicalPath()));
+  }
+
+  public static class PdfFileExpirationWrapper {
+    VirtualFile pdfFile;
+    boolean expired;
+    PdfFileExpirationWrapper(VirtualFile pdfFile) {
+      this.pdfFile = pdfFile;
+      this.expired = false;
+    }
+
+    public VirtualFile getPdfFile() {
+      return pdfFile;
+    }
   }
 
   public static class IncludeProps {

@@ -56,7 +56,7 @@ class MustacheFileEditor(
       // and announce the correspondent PdfFileEditor to reload
       if (events.any { it.file == editor.file }) {
         logger.debug("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
-        val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file);
+        val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
           .mustacheFileContentChangedFirstStep(updatedMustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
