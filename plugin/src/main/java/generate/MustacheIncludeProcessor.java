@@ -63,7 +63,7 @@ public class MustacheIncludeProcessor {
       if (includeProps.roots.isEmpty()) {
         includeProps.roots.add(name);
         //de asemenea se actualizeaza rootPdfFileMap
-        if(!rootPdfFileMap.containsKey(name)) {
+        if (!rootPdfFileMap.containsKey(name)) {
           rootPdfFileMap.put(name, null);
         }
         newRootPdfFileMap.put(name, null);
@@ -74,10 +74,6 @@ public class MustacheIncludeProcessor {
       .filter(rootName -> !newRootPdfFileMap.containsKey(rootName))
       .forEach(rootPdfFileMap::remove);
   }
-
-//  public Map<String, MustacheIncludeProcessor.IncludeProps> getIncludePropsMap() {
-//    return Map.copyOf(includePropsMap);
-//  }
 
   public Set<String> getRootsForMustacheFile(VirtualFile mustacheFile) {
     return getRootsForMustacheFile(mustacheFile.getCanonicalPath());
@@ -91,23 +87,16 @@ public class MustacheIncludeProcessor {
       .orElseThrow(() -> new RuntimeException("Include map corrupted for " + mustacheFileCanonicalPath));
   }
 
-//  public Map<String, VirtualFile> getRootPdfFileMap() {
-//    return Map.copyOf(rootPdfFileMap);
-//  }
+  public void tryInvalidateRootPdfFilesForMustacheFileRoots(Set<String> mustacheFileRoots) {
+    mustacheFileRoots.stream()
+      .filter(rootPdfFileMap::containsKey)
+      .forEach(v -> rootPdfFileMap.get(v).expired = true);
+  }
 
   public VirtualFile processRootPdfFile(String rootName) {
-    if (Optional.ofNullable(rootPdfFileMap.get(rootName)).map(v -> v.expired).orElse(true)) {
+//    if (Optional.ofNullable(rootPdfFileMap.get(rootName)).map(v -> v.expired).orElse(true)) {
+    if (rootPdfFileMap.get(rootName) == null || (rootPdfFileMap.get(rootName) != null && rootPdfFileMap.get(rootName).expired)) {
       var pdfFile = getPdfFile(rootName);
-      // check pair rootName <--> pdfFile uniqueness
-      rootPdfFileMap.values().stream()
-        .filter(Objects::nonNull)
-        .map(PdfFileExpirationWrapper::getPdfFile)
-        .map(VirtualFile::getCanonicalPath)
-        .filter(Objects::nonNull)
-        .filter(path -> path.equals(pdfFile.getCanonicalPath())).findAny()
-        .ifPresent(v -> {
-          throw new RuntimeException("The pair must be unique but isn't!? It should only be contained by a single root: " + v);
-        });
       rootPdfFileMap.put(rootName, new PdfFileExpirationWrapper(pdfFile));
     }
     return rootPdfFileMap.get(rootName).pdfFile; // same as pdfFile
@@ -123,15 +112,13 @@ public class MustacheIncludeProcessor {
   }
 
   public static class PdfFileExpirationWrapper {
+
     VirtualFile pdfFile;
     boolean expired;
+
     PdfFileExpirationWrapper(VirtualFile pdfFile) {
       this.pdfFile = pdfFile;
       this.expired = false;
-    }
-
-    public VirtualFile getPdfFile() {
-      return pdfFile;
     }
   }
 
