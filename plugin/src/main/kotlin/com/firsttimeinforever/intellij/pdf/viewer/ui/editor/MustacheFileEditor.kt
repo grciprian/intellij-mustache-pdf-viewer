@@ -19,9 +19,7 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.messages.Topic
-//import com.intellij.util.messages.Topic
 import generate.Utils.FILE_RESOURCES_PATH_WITH_PREFIX
-//import generate.Utils.getProcessedPdfFile
 import org.jetbrains.annotations.NotNull
 
 class MustacheFileEditor(
@@ -57,6 +55,7 @@ class MustacheFileEditor(
       if (events.any { it.file == editor.file }) {
         logger.debug("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
         val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file)
+        mustacheIncludeProcessor.tryInvalidateRootPdfFilesForMustacheFileRoots(updatedMustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
           .mustacheFileContentChangedFirstStep(updatedMustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
