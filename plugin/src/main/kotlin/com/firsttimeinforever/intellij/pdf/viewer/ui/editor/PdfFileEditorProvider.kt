@@ -36,7 +36,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware {
         if (virtualFile.fileType == PdfFileType) {
           return PdfFileEditor(project, virtualFile)
         } else if (mainProvider.accept(project, virtualFile) && virtualFile.extension == "mustache") {
-          // TODO make this prittier, do not instantiate here this static variable
+          // TODO make this prettier, do not instantiate here this static variable
           FILE_RESOURCES_PATH_WITH_PREFIX = getFileResourcesPathWithPrefix(project, virtualFile)
           return MustacheFileEditor(project, virtualFile).getEditor()
         }

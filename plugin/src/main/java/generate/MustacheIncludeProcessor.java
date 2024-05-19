@@ -72,6 +72,7 @@ public class MustacheIncludeProcessor {
     //clean expired roots
     rootPdfFileMap.keySet().stream()
       .filter(rootName -> !newRootPdfFileMap.containsKey(rootName))
+      .collect(Collectors.toUnmodifiableSet())
       .forEach(rootPdfFileMap::remove);
   }
 

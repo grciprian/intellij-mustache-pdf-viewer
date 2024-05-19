@@ -74,15 +74,16 @@ class MustacheFileEditor(
 
   private inner class FileEditorChangedListener : BulkFileListener {
     override fun after(events: MutableList<out VFileEvent>) {
-      // processFileIncludePropsMap after any files modification under resources folder
-      if (events.any { it.file?.canonicalPath?.indexOf(FILE_RESOURCES_PATH_WITH_PREFIX, 0, false) == 0 }) {
-        mustacheIncludeProcessor.processFileIncludePropsMap()
-      }
       // if the file modified is the current opened editor file then reprocess the pdf file
       // and announce the correspondent PdfFileEditor to reload
-      if (events.any { it.file == editor.file }) {
-        logger.debug("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
+      if (events.any {
+          it.file == editor.file && it.file?.canonicalPath?.indexOf(FILE_RESOURCES_PATH_WITH_PREFIX, 0, false) == 0
+        }) {
+        println("processFileIncludePropsMap after any files modification under resources folder")
+        mustacheIncludeProcessor.processFileIncludePropsMap()
+        println("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
         val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file)
+        println(updatedMustacheFileRoots)
         mustacheIncludeProcessor.tryInvalidateRootPdfFilesForMustacheFileRoots(updatedMustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
           .mustacheFileContentChangedFirstStep(updatedMustacheFileRoots)
