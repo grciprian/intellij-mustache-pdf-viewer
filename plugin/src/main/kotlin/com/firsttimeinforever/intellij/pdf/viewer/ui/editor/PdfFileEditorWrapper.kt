@@ -48,11 +48,17 @@ class PdfFileEditorWrapper(
   private fun tryUpdateTabbedPane(updatedMustacheFileRoots: Set<String>) {
     // update fileRoots with maybe modified ones before adding the pdf
     fileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(mustacheFile)
+    println("fileRoots")
+    println(fileRoots)
 
     // if source fileRoots intersects this PdfFileEditorWrapper target fileRoots
     // then the mustache file that was modified impacted
     val livingRoots = updatedMustacheFileRoots.intersect(fileRoots)
     if (livingRoots.isEmpty()) return@tryUpdateTabbedPane
+    println("livingRoots")
+    println(livingRoots)
+    println("tabRootAware")
+    println(tabRootAware)
 
     tabRootAware.forEach {
       if (livingRoots.contains(it)) {
@@ -60,7 +66,11 @@ class PdfFileEditorWrapper(
       }
     }
     val expiredRoots = tabRootAware.subtract(fileRoots)
+    println("expiredRoots")
+    println(expiredRoots)
     val newRoots = fileRoots.subtract(tabRootAware.toSet())
+    println("newRoots")
+    println(newRoots)
 
     // remove roots not needed anymore
     var i = 0

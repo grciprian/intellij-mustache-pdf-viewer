@@ -3,9 +3,14 @@ package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettingsListener
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.ex.EditorEventMulticasterEx
+import com.intellij.openapi.editor.ex.FocusChangeListener
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.TextEditor
@@ -24,7 +29,7 @@ import org.jetbrains.annotations.NotNull
 
 class MustacheFileEditor(
   val project: @NotNull Project, val virtualFile: @NotNull VirtualFile
-) {
+) : Disposable {
   private val mustacheContextService = project.service<MustacheContextService>()
   private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
   private val provider = TextEditorProvider.getInstance()
@@ -42,6 +47,29 @@ class MustacheFileEditor(
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC, PdfViewerSettingsListener {
       textEditorWithPreview.isVerticalSplit = !it.isVerticalSplit
     })
+    // TODO something here on focus?
+//    textEditorWithPreview.component.focus
+//    textEditorWithPreview.component.addFocusListener()
+    val multicaster = EditorFactory.getInstance().eventMulticaster
+    textEditorWithPreview.tabActions
+    if (multicaster is EditorEventMulticasterEx) {
+      multicaster.addFocusChangeListener(object : FocusChangeListener {
+        override fun focusGained(editor: Editor) {
+//          try {
+//            val name = (editor as TextEditorWithPreview).previewEditor.name
+//            println(name)
+//          } catch (e: Exception) {
+//            println(e.message)
+//          }
+//          if(editor is TextEditorWithPreview) {
+//            println(editor.previewEditor.name)
+//          }
+//          println(editor.virtualFile.path)
+          editor.component.revalidate()
+          editor.component.repaint()
+        }
+      }, this)
+    }
   }
 
   private inner class FileEditorChangedListener : BulkFileListener {
@@ -60,6 +88,8 @@ class MustacheFileEditor(
           .mustacheFileContentChangedFirstStep(updatedMustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
           .mustacheFileContentChangedSecondStep(updatedMustacheFileRoots)
+//        preview.component.revalidate()
+//        preview.component.repaint()
       }
     }
   }
@@ -94,5 +124,9 @@ class MustacheFileEditor(
     val MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC = Topic(MustacheFileListenerSecondStep::class.java)
     private const val NAME = "Mustache Viewer File Editor With Preview"
     private val logger = logger<MustacheFileEditor>()
+  }
+
+  override fun dispose() {
+//    TODO("Not yet implemented")
   }
 }
