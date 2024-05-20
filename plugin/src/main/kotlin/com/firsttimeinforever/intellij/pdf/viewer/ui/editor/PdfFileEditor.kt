@@ -25,6 +25,11 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
   private val mustacheContextService = project.service<MustacheContextService>()
   private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
+  var rootName: String = null.toString()
+
+  constructor(project: Project, pdfFile: VirtualFile, rootName: String) : this(project, pdfFile) {
+    this.rootName = rootName
+  }
 
   init {
     Disposer.register(this, viewComponent)

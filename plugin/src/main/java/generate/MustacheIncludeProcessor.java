@@ -104,6 +104,7 @@ public class MustacheIncludeProcessor {
   }
 
   public String getRootForPdfFile(VirtualFile pdfFile) {
+    System.out.println(rootPdfFileMap);
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
       .filter(entry -> Objects.equals(entry.getValue().pdfFile.getCanonicalPath(), pdfFile.getCanonicalPath()))
@@ -120,6 +121,14 @@ public class MustacheIncludeProcessor {
     PdfFileExpirationWrapper(VirtualFile pdfFile) {
       this.pdfFile = pdfFile;
       this.expired = false;
+    }
+
+    @Override
+    public String toString() {
+      return "PdfFileExpirationWrapper{" +
+             "pdfFile=" + pdfFile +
+             ", expired=" + expired +
+             '}';
     }
   }
 

@@ -11,6 +11,9 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Objects;
 
+import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
+import static java.util.Collections.EMPTY_MAP;
+
 public class Utils {
 
   public static final String DEFAULT_PREFIX = "/templates/";
@@ -46,7 +49,7 @@ public class Utils {
       var path = Path.of(FILE_RESOURCES_PATH_WITH_PREFIX + simpleFilename + DEFAULT_SUFFIX);
       var virtualFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(virtualFile, "virtualFile for getProcessedPdfFile should not be null! Path: " + path);
-      var pdfByteArray = PdfGenerationService.getInstance(FILE_RESOURCES_PATH_WITH_PREFIX).generatePdf(Collections.EMPTY_MAP, VfsUtil.loadText(virtualFile));
+      var pdfByteArray = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(virtualFile));
       var outputPath = Path.of(simpleFilename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + ".mtf.pdf"); // mtf MustacheTemporaryFile
       if (!Files.exists(outputPath)) {
         Files.createFile(outputPath);

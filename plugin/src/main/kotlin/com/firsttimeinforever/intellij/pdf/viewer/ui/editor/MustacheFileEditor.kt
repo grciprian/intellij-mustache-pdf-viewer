@@ -50,26 +50,25 @@ class MustacheFileEditor(
     // TODO something here on focus?
 //    textEditorWithPreview.component.focus
 //    textEditorWithPreview.component.addFocusListener()
-    val multicaster = EditorFactory.getInstance().eventMulticaster
-    textEditorWithPreview.tabActions
-    if (multicaster is EditorEventMulticasterEx) {
-      multicaster.addFocusChangeListener(object : FocusChangeListener {
-        override fun focusGained(editor: Editor) {
-//          try {
-//            val name = (editor as TextEditorWithPreview).previewEditor.name
-//            println(name)
-//          } catch (e: Exception) {
-//            println(e.message)
-//          }
-//          if(editor is TextEditorWithPreview) {
-//            println(editor.previewEditor.name)
-//          }
-//          println(editor.virtualFile.path)
-          editor.component.revalidate()
-          editor.component.repaint()
-        }
-      }, this)
-    }
+//    val multicaster = EditorFactory.getInstance().eventMulticaster
+//    if (multicaster is EditorEventMulticasterEx) {
+//      multicaster.addFocusChangeListener(object : FocusChangeListener {
+//        override fun focusGained(editor: Editor) {
+////          try {
+////            val name = (editor as TextEditorWithPreview).previewEditor.name
+////            println(name)
+////          } catch (e: Exception) {
+////            println(e.message)
+////          }
+////          if(editor is TextEditorWithPreview) {
+////            println(editor.previewEditor.name)
+////          }
+////          println(editor.virtualFile.path)
+//          editor.component.revalidate()
+//          editor.component.repaint()
+//        }
+//      }, this)
+//    }
   }
 
   private inner class FileEditorChangedListener : BulkFileListener {

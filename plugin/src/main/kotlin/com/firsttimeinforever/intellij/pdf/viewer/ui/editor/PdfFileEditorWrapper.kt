@@ -10,17 +10,18 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
+import kotlinx.collections.immutable.toImmutableList
 import javax.swing.JComponent
 
 class PdfFileEditorWrapper(
   private val project: Project, private val mustacheFile: VirtualFile
 ) : FileEditorBase(), DumbAware {
   private val jbTabbedPane = JBTabbedPane()
-  private val tabRootAware = mutableListOf<String>()
+  private val syncedTabbedEditors = mutableListOf<PdfFileEditor>()
   private val messageBusConnection = project.messageBus.connect()
   private val mustacheContextService = project.service<MustacheContextService>()
   private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
-//  private var fileRoots: Set<String> = mustacheIncludeProcessor.getRootsForMustacheFile(mustacheFile)
+  // orice fisier mustache deschis are asociat un PdfFileEditorWrapper cu un TabbedPane
 
   init {
     Disposer.register(this, messageBusConnection)
@@ -47,19 +48,24 @@ class PdfFileEditorWrapper(
 
   private fun tryUpdateTabbedPane(updatedMustacheFileRoots: Set<String>) {
     println("\n\nTRYUpdateTabbedPane FOR " + mustacheFile.name)
-    println("updatedMustacheFileRoots")
+    println("updatedMustacheFileRoots for SOURCE")
     println(updatedMustacheFileRoots)
     println("tabRootAware")
-    println(tabRootAware)
+    val updatedRoots = mustacheIncludeProcessor.getRootsForMustacheFile(mustacheFile)
+    println("updatedRoots")
+    println(updatedRoots)
+    val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableList()
+    println("syncedTabbedRootNames")
+    println(syncedTabbedRootNames)
     // update fileRoots with maybe modified ones before adding the pdf
 //    fileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(mustacheFile)
 //    println("fileRoots")
 //    println(fileRoots)
 
 
-    val livingRoots = tabRootAware.intersect(updatedMustacheFileRoots)
-    val expiredRoots = tabRootAware.subtract(updatedMustacheFileRoots)
-    val newRoots = updatedMustacheFileRoots.subtract(tabRootAware.toSet())
+    val livingRoots = syncedTabbedRootNames.intersect(updatedRoots)
+    val expiredRoots = syncedTabbedRootNames.subtract(updatedRoots)
+    val newRoots = updatedRoots.subtract(syncedTabbedRootNames)
 
 //    if (livingRoots.isEmpty()) return
     println("livingRoots")
@@ -75,11 +81,12 @@ class PdfFileEditorWrapper(
 
     // remove roots not needed anymore
     var i = 0
-    while (i < tabRootAware.size) {
-      if (expiredRoots.contains(tabRootAware.elementAt(i))) {
-        println("removing " + tabRootAware.elementAt(i))
+    while (i < syncedTabbedRootNames.size) {
+      if (syncedTabbedEditors.size > 0 && expiredRoots.contains(syncedTabbedRootNames.elementAt(i))) {
+        println("removing " + syncedTabbedRootNames.elementAt(i))
         jbTabbedPane.remove(i)
-        tabRootAware.removeAt(i)
+        syncedTabbedEditors[i].dispose()
+        syncedTabbedEditors.removeAt(i)
         i -= 1
       }
       ++i
@@ -92,9 +99,9 @@ class PdfFileEditorWrapper(
 
   private fun addPdfFileEditorTab(rootName: String) {
     val processedPdfFile = mustacheIncludeProcessor.processRootPdfFile(rootName)
-    val editor = PdfFileEditor(project, processedPdfFile)
+    val editor = PdfFileEditor(project, processedPdfFile, rootName)
     jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
-    tabRootAware.add(ADD_INDEX_FOR_NEW_TAB, rootName)
+    syncedTabbedEditors.add(ADD_INDEX_FOR_NEW_TAB, editor)
   }
 
   override fun getComponent(): JComponent = jbTabbedPane
