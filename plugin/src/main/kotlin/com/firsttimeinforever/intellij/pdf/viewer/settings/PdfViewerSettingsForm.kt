@@ -26,6 +26,7 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
   val defaultSidebarViewMode = properties.property(settings.defaultSidebarViewMode)
   val customMustacheFontsPath = properties.property(settings.customMustacheFontsPath)
   val isVerticalSplit = properties.property(settings.isVerticalSplit)
+  val hasMockVars = properties.property(settings.hasMockVars)
 
   private val generalSettingsGroup = panel {
     group(PdfViewerBundle.message("pdf.viewer.settings.group.general")) {
@@ -56,6 +57,10 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
           model = DefaultComboBoxModel(arrayOf(false, true)),
           renderer = SimpleListCellRenderer.create("", ::presentSplitLayout)
         ).bindItem(isVerticalSplit)
+      }.bottomGap(BottomGap.SMALL)
+      row {
+        checkBox(PdfViewerBundle.message("pdf.viewer.settings.mustache.preview.use.mock.label"))
+          .bindSelected(hasMockVars)
       }.bottomGap(BottomGap.SMALL)
     }
   }
@@ -119,23 +124,23 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
           .comment(PdfViewerBundle.message("pdf.viewer.settings.group.colors.viewer.comment"))
       }
       indent {
-          panel {
-            row(PdfViewerBundle.message("pdf.viewer.settings.foreground")) {
-              cell(foregroundColorPanel)
+        panel {
+          row(PdfViewerBundle.message("pdf.viewer.settings.foreground")) {
+            cell(foregroundColorPanel)
+          }
+          row(PdfViewerBundle.message("pdf.viewer.settings.background")) {
+            cell(backgroundColorPanel)
+          }
+          row(PdfViewerBundle.message("pdf.viewer.settings.icons")) {
+            cell(iconColorPanel)
+            rowComment(PdfViewerBundle.message("pdf.viewer.settings.icons.color.notice"))
+          }
+          row {
+            link(PdfViewerBundle.message("pdf.viewer.settings.set.current.theme")) {
+              resetViewerColorsToTheme()
             }
-            row(PdfViewerBundle.message("pdf.viewer.settings.background")) {
-              cell(backgroundColorPanel)
-            }
-            row(PdfViewerBundle.message("pdf.viewer.settings.icons")) {
-              cell(iconColorPanel)
-              rowComment(PdfViewerBundle.message("pdf.viewer.settings.icons.color.notice"))
-            }
-            row {
-              link(PdfViewerBundle.message("pdf.viewer.settings.set.current.theme")) {
-                resetViewerColorsToTheme()
-              }
-            }
-          }.enabledIf(useCustomColors)
+          }
+        }.enabledIf(useCustomColors)
       }
     }
   }

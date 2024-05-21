@@ -8,7 +8,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.Objects;
 
 import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
@@ -49,7 +48,8 @@ public class Utils {
       var path = Path.of(FILE_RESOURCES_PATH_WITH_PREFIX + simpleFilename + DEFAULT_SUFFIX);
       var virtualFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(virtualFile, "virtualFile for getProcessedPdfFile should not be null! Path: " + path);
-      var pdfByteArray = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(virtualFile));
+      var pdfByteArray = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(virtualFile)
+      );
       var outputPath = Path.of(simpleFilename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + ".mtf.pdf"); // mtf MustacheTemporaryFile
       if (!Files.exists(outputPath)) {
         Files.createFile(outputPath);

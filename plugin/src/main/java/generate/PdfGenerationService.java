@@ -1,39 +1,32 @@
 package generate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
-import com.samskivert.mustache.DefaultCollector;
 import com.samskivert.mustache.Mustache;
-import com.samskivert.mustache.Template;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.helper.W3CDom;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities;
 
 import java.awt.*;
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-
-import static generate.Utils.DEFAULT_SUFFIX;
-import static generate.Utils.FILE_RESOURCES_PATH_WITH_PREFIX;
 
 public class PdfGenerationService {
 
-  static final String PDF_GENERATION_ERROR = "A apărut o problemă în momentul generării fișierului";
-  static final String PDF_GENERATION_EMPTY_FILE = "Fișierul generat este gol. Te rugăm să încerci mai târziu!";
+  static final String PDF_GENERATION_ERROR = "A apărut o problemă în momentul generării fișierului.";
+  static final String PDF_GENERATION_EMPTY_FILE = "Fișierul generat este gol.";
   private static final Logger logger = Logger.getInstance(PdfGenerationService.class);
-  private static final Mustache.TemplateLoader TEMPLATE_LOADER = name -> {
-    var file = new File(FILE_RESOURCES_PATH_WITH_PREFIX, name + DEFAULT_SUFFIX);
-    if (!file.exists()) {
-      logger.debug("Faulty partial [" + name + "].");
-      return new StringReader("<span style=\"color: red !important;\">[FAULTY_PARTIAL>" + name + "]</span>");
-    }
-    return new FileReader(file);
-  };
+  private static final String ERROR_HTML = """
+    <p style="font-weight: bold;">{{message}}</p>
+    <pre style="word-wrap: break-word; white-space: pre-wrap;">{{stackTrace}}</pre>
+    """;
   private static PdfGenerationService instance;
-  private final ObjectMapper objectMapper = new ObjectMapper();
   private final Mustache.Compiler mustacheCompiler;
 
   private PdfGenerationService(Mustache.Compiler compiler) {
@@ -42,25 +35,25 @@ public class PdfGenerationService {
 
   public static PdfGenerationService getInstance() {
     if (PdfGenerationService.instance != null) return PdfGenerationService.instance;
-    PdfGenerationService.instance = new PdfGenerationService(
-      Mustache.compiler()
-        .withLoader(TEMPLATE_LOADER)
-        .withCollector(new CustomCollector())
-    );
+    PdfGenerationService.instance = new PdfGenerationService(CustomMustacheCompiler.getInstance());
     return PdfGenerationService.instance;
   }
 
   public byte[] generatePdf(Object model, String templateContent) {
     try (var outputStream = new ByteArrayOutputStream()) {
-      logger.debug("Generare PDF cu TEMPLATE -> DATE\n" + objectMapper.writeValueAsString(model));
       writePdfContentToStream(outputStream, getHtml(model, templateContent));
       var pdf = outputStream.toByteArray();
       if (pdf.length == 0) {
         throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
       }
       return outputStream.toByteArray();
-    } catch (IOException e) {
-      throw new RuntimeException(PDF_GENERATION_ERROR, e);
+    } catch (Exception e) {
+      try (var os = new ByteArrayOutputStream()) {
+        writePdfContentToStream(os, getHtml(new ErrorObject(e), ERROR_HTML));
+        return os.toByteArray();
+      } catch (Exception ex) {
+        throw new RuntimeException(PDF_GENERATION_ERROR, ex);
+      }
     }
   }
 
@@ -71,6 +64,18 @@ public class PdfGenerationService {
     builder.withW3cDocument(new W3CDom().fromJsoup(document), "/");
     addFonts(builder);
     builder.run();
+  }
+
+  private String getHtml(Object model, String templateContent) {
+    return mustacheCompiler
+      .compile(templateContent)
+      .execute(model);
+  }
+
+  private Document convertHtmlToXHtml(String pdfContent) {
+    var document = Jsoup.parse(pdfContent);
+    document.outputSettings().syntax(Document.OutputSettings.Syntax.xml).escapeMode(Entities.EscapeMode.xhtml).charset(StandardCharsets.UTF_8);
+    return document;
   }
 
   private void addFonts(PdfRendererBuilder pdfRendererBuilder) {
@@ -86,43 +91,28 @@ public class PdfGenerationService {
             var fontFamily = Font.createFont(Font.TRUETYPE_FONT, file).getFamily();
             pdfRendererBuilder.useFont(file, fontFamily);
           } catch (Exception e) {
-            logger.error("Nu s-a putut încărca fontul: {}", file.getName());
+            logger.error("Font could not be loaded: " + file.getName());
           }
         }
       }
     }
   }
 
-  private Document convertHtmlToXHtml(String pdfContent) {
-    var document = Jsoup.parse(pdfContent);
-    document.outputSettings().syntax(Document.OutputSettings.Syntax.xml).escapeMode(Entities.EscapeMode.xhtml).charset(StandardCharsets.UTF_8);
-    return document;
-  }
+  private static class ErrorObject {
+    private final String message;
+    private final String stackTrace;
 
-  private String getHtml(Object model, String templateContent) {
-    try {
-      return mustacheCompiler
-//        .defaultValue(RandomStringUtils.randomAlphanumeric(5))
-        .compile(templateContent)
-        .execute(model);
-    } catch (Exception exception) {
-      throw new RuntimeException(PDF_GENERATION_ERROR, exception);
+    public ErrorObject(Throwable throwable) {
+      this.message = throwable.getMessage();
+      this.stackTrace = ExceptionUtils.getStackTrace(throwable);
     }
-  }
 
-  private static final class CustomCollector extends DefaultCollector {
-    @Override
-    public Mustache.VariableFetcher createFetcher(Object ctx, String name) {
-      Mustache.VariableFetcher errorFetcher = (ctx1, name1) -> "<span style=\"color: red !important;\">[FAULTY_VAR>" + name1 + "]</span>";
-      try {
-        var fetcher = super.createFetcher(ctx, name);
-        if (Template.NO_FETCHER_FOUND == fetcher.get(ctx, name)) {
-          return errorFetcher;
-        }
-        return fetcher;
-      } catch (Exception e) {
-        return errorFetcher;
-      }
+    public String getMessage() {
+      return message;
+    }
+
+    public String getStackTrace() {
+      return stackTrace;
     }
   }
 
