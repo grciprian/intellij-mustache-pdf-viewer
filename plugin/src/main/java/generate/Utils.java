@@ -18,17 +18,21 @@ public class Utils {
   public static final String DEFAULT_PREFIX = "/templates/";
   public static final String DEFAULT_SUFFIX = ".mustache";
   public static final String JAVA_RESOURCES_FOLDER_NAME = "resources";
+  public static final String PDF_MUSTACHE_TEMPORARY_FILE_EXTENSION = ".mtf.pdf";
   public static String FILE_RESOURCES_PATH_WITH_PREFIX;
 
   private Utils() {
   }
 
-  //TODO maybe rethink this?
+  // TODO maybe rethink this?
+  // It is called multiple times, for every opened mustache
   public static String getFileResourcesPathWithPrefix(Project project, VirtualFile virtualFile) {
-    var canonicalPath = virtualFile.getCanonicalPath();
-    Objects.requireNonNull(canonicalPath, "Could not getFileResourcesPathWithPrefix because canonicalPath of virtualFile is null!");
-    var resourcesIndex = canonicalPath.lastIndexOf(JAVA_RESOURCES_FOLDER_NAME); //TODO maybe find a better solution? use project's path for calculation?
-    if (resourcesIndex != -1) return canonicalPath.substring(0, resourcesIndex + JAVA_RESOURCES_FOLDER_NAME.length()) + DEFAULT_PREFIX;
+    // maybe this is not the way. maybe another kind of path should be used for system specific
+    var projectPath = project.getBasePath();
+    var filePath = virtualFile.getCanonicalPath();
+    Objects.requireNonNull(filePath, "Could not getFileResourcesPathWithPrefix because canonicalPath of virtualFile is null!");
+    var resourcesIndex = filePath.indexOf(JAVA_RESOURCES_FOLDER_NAME, projectPath.length());
+    if (resourcesIndex != -1) return filePath.substring(0, resourcesIndex + JAVA_RESOURCES_FOLDER_NAME.length()) + DEFAULT_PREFIX;
     throw new RuntimeException("File is not in the resources folder of the java project!");
   }
 
@@ -48,9 +52,8 @@ public class Utils {
       var path = Path.of(FILE_RESOURCES_PATH_WITH_PREFIX + simpleFilename + DEFAULT_SUFFIX);
       var virtualFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(virtualFile, "virtualFile for getProcessedPdfFile should not be null! Path: " + path);
-      var pdfByteArray = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(virtualFile)
-      );
-      var outputPath = Path.of(simpleFilename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + ".mtf.pdf"); // mtf MustacheTemporaryFile
+      var pdfByteArray = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(virtualFile));
+      var outputPath = Path.of(simpleFilename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + PDF_MUSTACHE_TEMPORARY_FILE_EXTENSION); // mtf MustacheTemporaryFile
       if (!Files.exists(outputPath)) {
         Files.createFile(outputPath);
       }

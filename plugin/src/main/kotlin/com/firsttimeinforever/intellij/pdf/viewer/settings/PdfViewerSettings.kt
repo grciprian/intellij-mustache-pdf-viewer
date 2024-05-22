@@ -1,6 +1,7 @@
 package com.firsttimeinforever.intellij.pdf.viewer.settings
 
 import com.firsttimeinforever.intellij.pdf.viewer.model.SidebarViewMode
+import com.intellij.ide.impl.ProjectUtil
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
@@ -10,6 +11,9 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.messages.Topic
 import com.intellij.util.xmlb.XmlSerializerUtil.copyBean
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.*
 
 @State(name = "PdfViewerSettings", storages = [(Storage("pdf_viewer.xml"))])
 class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
@@ -24,13 +28,22 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
 
   var defaultSidebarViewMode: SidebarViewMode = SidebarViewMode.THUMBNAILS
 
-  var customMustacheFontsPath: String = ""
+  var customMustacheFontsPath: String = Optional.ofNullable(ProjectUtil.getActiveProject()?.basePath)
+    .map { "$it/fonts" }
+    .map {
+      val filePath = Path.of(it)
+      return@map if (Files.exists(filePath) && Files.isDirectory(filePath)) it else ""
+    }
+    .orElse("")
 
-  var isVerticalSplit = false
-  var hasMockVars = false
+  var isVerticalSplit = true
 
-  fun notifyListeners() {
-    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC).settingsChanged(this)
+  fun notifySettingsListeners() {
+    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_SETTINGS).settingsChanged(this)
+  }
+
+  fun notifySettingsFontsPathListeners() {
+    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_SETTINGS_FONTS_PATH).fontsPathChanged(this)
   }
 
   override fun getState() = this
@@ -40,7 +53,8 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
   }
 
   companion object {
-    val TOPIC = Topic(PdfViewerSettingsListener::class.java)
+    val TOPIC_SETTINGS = Topic(PdfViewerSettingsListener::class.java)
+    val TOPIC_SETTINGS_FONTS_PATH = Topic(PdfViewerSettingsFontsPathListener::class.java)
 
     val instance: PdfViewerSettings
       get() = service()

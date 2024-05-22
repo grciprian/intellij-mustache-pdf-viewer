@@ -1,11 +1,9 @@
 package generate;
 
-import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.samskivert.mustache.DefaultCollector;
 import com.samskivert.mustache.Escapers;
 import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Template;
-import org.apache.commons.lang3.RandomStringUtils;
 
 import java.io.File;
 import java.io.FileReader;
@@ -60,13 +58,9 @@ public class CustomMustacheCompiler {
     @Override
     public Mustache.VariableFetcher createFetcher(Object ctx, String name) {
       var errorFetcher = (Mustache.VariableFetcher) (ctx1, name1) -> DO_FAULTY_HTML_MESSAGE.apply(FaultyType.FAULTY_VAR, name1);
-      var mockFetcher = (Mustache.VariableFetcher) (ctx1, name1) -> DO_MOCK_HTML_MESSAGE.apply(name1 + "[" + RandomStringUtils.randomAlphanumeric(5) + "]");
       try {
         var fetcher = super.createFetcher(ctx, name);
         if (Template.NO_FETCHER_FOUND == fetcher.get(ctx, name)) {
-          if (PdfViewerSettings.Companion.getInstance().getHasMockVars()) {
-            return mockFetcher;
-          }
           return errorFetcher;
         }
         return fetcher;

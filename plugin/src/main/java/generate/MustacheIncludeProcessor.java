@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
 import static generate.Utils.*;
 
 public class MustacheIncludeProcessor {
@@ -39,7 +40,7 @@ public class MustacheIncludeProcessor {
         includePropsMap.put(relativePathFromResourcePathWithPrefix, IncludeProps.getEmpty());
       }
       try {
-        var contents = VfsUtil.loadText(virtualFile);
+        var contents = loadText(virtualFile);
         Arrays.stream(contents.split("(\\{\\{>)")).skip(1).forEach(include -> {
           var indexOfIncludeEnd = include.indexOf("}}");
           if (indexOfIncludeEnd == -1) throw new RuntimeException("Malformed include found!");
@@ -104,7 +105,6 @@ public class MustacheIncludeProcessor {
   }
 
   public String getRootForPdfFile(VirtualFile pdfFile) {
-    System.out.println(rootPdfFileMap);
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
       .filter(entry -> Objects.equals(entry.getValue().pdfFile.getCanonicalPath(), pdfFile.getCanonicalPath()))

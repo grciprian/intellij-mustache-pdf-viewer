@@ -112,7 +112,7 @@ class PdfJcefPreviewController(val project: Project, val virtualFile: VirtualFil
       doActualReload(tryToPreserveState = true)
     }
     doActualReload(tryToPreserveState = true)
-    messageBusConnection.subscribe(PdfViewerSettings.TOPIC, this)
+    messageBusConnection.subscribe(PdfViewerSettings.TOPIC_SETTINGS, this)
     messageBusConnection.subscribe(EditorColorsManager.TOPIC, this)
   }
 

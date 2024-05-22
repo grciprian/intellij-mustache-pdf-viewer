@@ -21,15 +21,15 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
         settings.customBackgroundColor != customBackgroundColor.get() ||
         settings.customIconColor != customIconColor.get() ||
         settings.customMustacheFontsPath != customMustacheFontsPath.get() ||
-        settings.isVerticalSplit != isVerticalSplit.get() ||
-        settings.hasMockVars != hasMockVars.get()
+        settings.isVerticalSplit != isVerticalSplit.get()
     } ?: false
   }
 
   override fun getDisplayName(): String = PdfViewerBundle.message("pdf.viewer.settings.display.name")
 
   override fun apply() {
-    val wasModified = isModified
+    val wasSettingsModified = isModified
+    val wasFontsPathModified = settings.customMustacheFontsPath != settingsForm?.customMustacheFontsPath?.get()
     settings.run {
       enableDocumentAutoReload = settingsForm?.enableDocumentAutoReload?.get() ?: enableDocumentAutoReload
       defaultSidebarViewMode = settingsForm?.defaultSidebarViewMode?.get() ?: defaultSidebarViewMode
@@ -42,10 +42,12 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
       customIconColor = settingsForm?.customIconColor?.get() ?: customIconColor
       customMustacheFontsPath = settingsForm?.customMustacheFontsPath?.get() ?: (project.basePath ?: "")
       isVerticalSplit = settingsForm?.isVerticalSplit?.get() ?: isVerticalSplit
-      hasMockVars = settingsForm?.hasMockVars?.get() ?: hasMockVars
     }
-    if (wasModified) {
-      settings.notifyListeners()
+    if (wasSettingsModified) {
+      settings.notifySettingsListeners()
+    }
+    if (wasFontsPathModified) {
+      settings.notifySettingsFontsPathListeners()
     }
   }
 

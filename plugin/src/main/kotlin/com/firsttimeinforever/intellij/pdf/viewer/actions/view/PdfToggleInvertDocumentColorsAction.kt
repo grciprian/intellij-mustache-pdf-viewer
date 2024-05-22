@@ -12,7 +12,7 @@ class PdfToggleInvertDocumentColorsAction : PdfToggleAction(ViewModeAwareness.BO
 
   override fun setSelected(event: AnActionEvent, state: Boolean) {
     PdfViewerSettings.instance.invertDocumentColors = state
-    PdfViewerSettings.instance.notifyListeners()
+    PdfViewerSettings.instance.notifySettingsListeners()
   }
 
   override fun update(event: AnActionEvent) {

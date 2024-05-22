@@ -9,7 +9,7 @@ class PdfViewerInvertColorsListener : EditorColorsListener {
     if (PdfViewerSettings.instance.invertColorsWithTheme) {
       val backGround = scheme?.defaultBackground ?: return
       PdfViewerSettings.instance.invertDocumentColors = ColorUtil.isDark(backGround)
-      PdfViewerSettings.instance.notifyListeners()
+      PdfViewerSettings.instance.notifySettingsListeners()
     }
   }
 }

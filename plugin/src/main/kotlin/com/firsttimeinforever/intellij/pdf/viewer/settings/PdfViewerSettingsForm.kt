@@ -26,7 +26,6 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
   val defaultSidebarViewMode = properties.property(settings.defaultSidebarViewMode)
   val customMustacheFontsPath = properties.property(settings.customMustacheFontsPath)
   val isVerticalSplit = properties.property(settings.isVerticalSplit)
-  val hasMockVars = properties.property(settings.hasMockVars)
 
   private val generalSettingsGroup = panel {
     group(PdfViewerBundle.message("pdf.viewer.settings.group.general")) {
@@ -57,10 +56,6 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
           model = DefaultComboBoxModel(arrayOf(false, true)),
           renderer = SimpleListCellRenderer.create("", ::presentSplitLayout)
         ).bindItem(isVerticalSplit)
-      }.bottomGap(BottomGap.SMALL)
-      row {
-        checkBox(PdfViewerBundle.message("pdf.viewer.settings.mustache.preview.use.mock.label"))
-          .bindSelected(hasMockVars)
       }.bottomGap(BottomGap.SMALL)
     }
   }

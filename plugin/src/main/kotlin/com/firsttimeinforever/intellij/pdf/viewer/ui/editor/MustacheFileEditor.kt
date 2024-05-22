@@ -7,10 +7,6 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.editor.ex.EditorEventMulticasterEx
-import com.intellij.openapi.editor.ex.FocusChangeListener
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.TextEditor
@@ -42,9 +38,12 @@ class MustacheFileEditor(
   )
 
   init {
+//    Disposer.register(this, textEditorWithPreview)
     Disposer.register(textEditorWithPreview, messageBusConnection)
+    Disposer.register(textEditorWithPreview, editor)
+    Disposer.register(textEditorWithPreview, preview)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileEditorChangedListener)
-    messageBusConnection.subscribe(PdfViewerSettings.TOPIC, PdfViewerSettingsListener {
+    messageBusConnection.subscribe(PdfViewerSettings.TOPIC_SETTINGS, PdfViewerSettingsListener {
       textEditorWithPreview.isVerticalSplit = !it.isVerticalSplit
     })
   }
@@ -60,22 +59,23 @@ class MustacheFileEditor(
         mustacheIncludeProcessor.processFileIncludePropsMap()
         println("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
         val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file)
+        println("updatedMustacheFileRoots")
         println(updatedMustacheFileRoots)
         mustacheIncludeProcessor.tryInvalidateRootPdfFilesForMustacheFileRoots(updatedMustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
-          .mustacheFileContentChangedFirstStep(updatedMustacheFileRoots)
+          .mustacheFileContentChangedFirstStep()
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
           .mustacheFileContentChangedSecondStep(updatedMustacheFileRoots)
       }
     }
   }
 
-  fun getEditor(): TextEditorWithPreview {
+  fun getTextEditorWithPreview(): TextEditorWithPreview {
     return textEditorWithPreview
   }
 
   fun interface MustacheFileListenerFirstStep {
-    fun mustacheFileContentChangedFirstStep(updatedMustacheFileRoots: Set<String>)
+    fun mustacheFileContentChangedFirstStep()
   }
 
   fun interface MustacheFileListenerSecondStep {
@@ -103,6 +103,10 @@ class MustacheFileEditor(
   }
 
   override fun dispose() {
-//    TODO("Not yet implemented")
+    messageBusConnection.disconnect()
+    Disposer.dispose(messageBusConnection)
+    Disposer.dispose(editor)
+    Disposer.dispose(preview)
+    Disposer.dispose(textEditorWithPreview)
   }
 }
