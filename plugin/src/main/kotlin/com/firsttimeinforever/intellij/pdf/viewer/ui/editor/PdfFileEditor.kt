@@ -85,7 +85,6 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
 
   override fun dispose() {
     super.dispose()
-//    println("Editor for " + pdfFile.canonicalPath + " has been disposed successfully!")
     messageBusConnection.disconnect()
     Disposer.dispose(messageBusConnection)
     Disposer.dispose(viewComponent)

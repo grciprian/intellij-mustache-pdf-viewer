@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX;
 import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
 import static generate.Utils.*;
 
@@ -18,7 +19,7 @@ public class MustacheIncludeProcessor {
   private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
 
   private MustacheIncludeProcessor() {
-    Objects.requireNonNull(FILE_RESOURCES_PATH_WITH_PREFIX, "FILE_RESOURCES_PATH_WITH_PREFIX must not be null!");
+    Objects.requireNonNull(FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX, "FILE_RESOURCES_PATH_WITH_PREFIX must not be null!");
     processFileIncludePropsMap();
   }
 
@@ -30,12 +31,12 @@ public class MustacheIncludeProcessor {
 
   public void processFileIncludePropsMap() {
     includePropsMap.clear();
-    var root = VfsUtil.findFile(Path.of(FILE_RESOURCES_PATH_WITH_PREFIX), true);
-    Objects.requireNonNull(root, "Root folder FILE_RESOURCES_PATH_WITH_PREFIX " + FILE_RESOURCES_PATH_WITH_PREFIX + " not found!");
+    var root = VfsUtil.findFile(Path.of(FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX), true);
+    Objects.requireNonNull(root, "Root folder FILE_RESOURCES_PATH_WITH_PREFIX " + FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX + " not found!");
     // TODO alta tratare daca nu e gasit root resources with prefix?
     VfsUtil.processFileRecursivelyWithoutIgnored(root, virtualFile -> {
       if (virtualFile.isDirectory()) return true;
-      var relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(virtualFile);
+      var relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX, virtualFile);
       if (!includePropsMap.containsKey(relativePathFromResourcePathWithPrefix)) {
         includePropsMap.put(relativePathFromResourcePathWithPrefix, IncludeProps.getEmpty());
       }
@@ -82,7 +83,7 @@ public class MustacheIncludeProcessor {
   }
 
   public Set<String> getRootsForMustacheFile(String mustacheFileCanonicalPath) {
-    var relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(mustacheFileCanonicalPath);
+    var relativePathFromResourcePathWithPrefix = getRelativePathFromResourcePathWithPrefix(FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX, mustacheFileCanonicalPath);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePathFromResourcePathWithPrefix)).findAny()
       .map(v -> v.getValue().getRoots())
@@ -98,7 +99,7 @@ public class MustacheIncludeProcessor {
   public VirtualFile processRootPdfFile(String rootName) {
 //    if (Optional.ofNullable(rootPdfFileMap.get(rootName)).map(v -> v.expired).orElse(true)) {
     if (rootPdfFileMap.get(rootName) == null || (rootPdfFileMap.get(rootName) != null && rootPdfFileMap.get(rootName).expired)) {
-      var pdfFile = getPdfFile(rootName);
+      var pdfFile = getPdfFile(FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX, rootName);
       rootPdfFileMap.put(rootName, new PdfFileExpirationWrapper(pdfFile));
     }
     return rootPdfFileMap.get(rootName).pdfFile; // same as pdfFile

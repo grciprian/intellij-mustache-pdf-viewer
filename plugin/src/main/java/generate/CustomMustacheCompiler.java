@@ -9,21 +9,18 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.StringReader;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 
-import static generate.Utils.DEFAULT_SUFFIX;
-import static generate.Utils.FILE_RESOURCES_PATH_WITH_PREFIX;
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX;
+import static generate.Utils.MUSTACHE_DEFAULT_SUFFIX;
 
 public class CustomMustacheCompiler {
 
   private static final BiFunction<CustomMustacheCompiler.FaultyType, String, String> DO_FAULTY_HTML_MESSAGE = (type, name) ->
     "<span style=\"color: red !important;\">[" + type.name() + ">" + name + "]</span>";
-  private static final Function<String, String> DO_MOCK_HTML_MESSAGE = (name) ->
-    "<span style=\"color: red !important;\">" + name + "</span>";
   private static final String FAULTY_HTML_REGEX_MATCHER = "<span style=\"color: red !important;\">\\[FAULTY_VAR>.*?\\]<\\/span>";
   private static final Mustache.TemplateLoader TEMPLATE_LOADER = name -> {
-    var file = new File(FILE_RESOURCES_PATH_WITH_PREFIX, name + DEFAULT_SUFFIX);
+    var file = new File(FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX, name + "." + MUSTACHE_DEFAULT_SUFFIX);
     if (!file.exists()) {
       return new StringReader(DO_FAULTY_HTML_MESSAGE.apply(CustomMustacheCompiler.FaultyType.FAULTY_PARTIAL, name));
     }
