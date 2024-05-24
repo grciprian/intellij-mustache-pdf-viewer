@@ -17,6 +17,7 @@ import java.util.*
 
 @State(name = "PdfViewerSettings", storages = [(Storage("pdf_viewer.xml"))])
 class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
+
   var useCustomColors = false
   var customBackgroundColor: Int = defaultBackgroundColor.rgb
   var customForegroundColor: Int = defaultForegroundColor.rgb
@@ -29,7 +30,7 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
   var defaultSidebarViewMode: SidebarViewMode = SidebarViewMode.THUMBNAILS
 
   var customMustacheFontsPath: String = Optional.ofNullable(ProjectUtil.getActiveProject()?.basePath)
-    .map { "$it/fonts" }
+    .map { "$it/$defaultFontsPath" }
     .map {
       val filePath = Path.of(it)
       return@map if (Files.exists(filePath) && Files.isDirectory(filePath)) it else ""
@@ -69,6 +70,8 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
       get() = defaultForegroundColor
 
     const val defaultDocumentColorsInvertIntensity = 85
+
+    const val defaultFontsPath = "fonts"
 
     val enableExperimentalFeatures: Boolean
       get() = Registry.`is`("pdf.viewer.enableExperimentalFeatures")

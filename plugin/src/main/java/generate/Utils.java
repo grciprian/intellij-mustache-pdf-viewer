@@ -17,8 +17,8 @@ public class Utils {
 
   public static final String MUSTACHE_DEFAULT_PREFIX = "templates";
   public static final String MUSTACHE_DEFAULT_SUFFIX = "mustache";
-  public static final String JAVA_RESOURCES_FOLDER_NAME = "resources";
   public static final String MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX = ".mtf.pdf";
+  public static final String JAVA_RESOURCES_WITH_MUSTACHE_PREFIX = "resources/" + MUSTACHE_DEFAULT_PREFIX + "/";
 
   private Utils() {
   }
@@ -31,9 +31,9 @@ public class Utils {
     var filePath = virtualFile.getCanonicalPath();
     Objects.requireNonNull(projectPath, "Could not getFileResourcesPathWithPrefix because path of project is null!");
     Objects.requireNonNull(filePath, "Could not getFileResourcesPathWithPrefix because path of virtualFile is null!");
-    var resourcesIndex = filePath.indexOf(JAVA_RESOURCES_FOLDER_NAME, projectPath.length());
+    var resourcesIndex = filePath.indexOf(JAVA_RESOURCES_WITH_MUSTACHE_PREFIX, projectPath.length());
     if (resourcesIndex != -1)
-      return filePath.substring(0, resourcesIndex + JAVA_RESOURCES_FOLDER_NAME.length()) + "/" + MUSTACHE_DEFAULT_PREFIX + "/";
+      return filePath.substring(0, resourcesIndex + JAVA_RESOURCES_WITH_MUSTACHE_PREFIX.length());
     throw new RuntimeException("File is not in the resources folder of the java project!");
   }
 

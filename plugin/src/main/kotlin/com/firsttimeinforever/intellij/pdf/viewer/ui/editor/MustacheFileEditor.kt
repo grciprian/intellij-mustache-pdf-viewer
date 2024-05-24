@@ -58,8 +58,6 @@ class MustacheFileEditor(
         mustacheIncludeProcessor.processFileIncludePropsMap()
         println("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
         val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file)
-        println("updatedMustacheFileRoots")
-        println(updatedMustacheFileRoots)
         mustacheIncludeProcessor.tryInvalidateRootPdfFilesForMustacheFileRoots(updatedMustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
           .mustacheFileContentChangedFirstStep()

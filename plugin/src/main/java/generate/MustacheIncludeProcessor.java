@@ -159,5 +159,13 @@ public class MustacheIncludeProcessor {
         dp = dp.stream().filter(directParent -> !includeMap.getOrDefault(directParent, IncludeProps.getEmpty()).directParents.isEmpty()).map(directParentWithDirectParents -> includeMap.getOrDefault(directParentWithDirectParents, IncludeProps.getEmpty()).directParents).flatMap(Set::stream).collect(Collectors.toUnmodifiableSet());
       }
     }
+
+    @Override
+    public String toString() {
+      return "IncludeProps{" +
+             "directParents=" + directParents +
+             ", roots=" + roots +
+             '}';
+    }
   }
 }

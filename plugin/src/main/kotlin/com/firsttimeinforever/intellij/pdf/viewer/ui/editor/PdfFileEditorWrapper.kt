@@ -3,8 +3,10 @@ package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettingsFontsPathListener
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MustacheFileEditor.Companion.MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.DumbAware
@@ -40,43 +42,31 @@ class PdfFileEditorWrapper(
       PdfViewerSettingsFontsPathListener {
         val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableSet()
         mustacheIncludeProcessor.tryInvalidateRootPdfFilesForMustacheFileRoots(syncedTabbedRootNames)
-        syncedTabbedEditors
-          .map { it.rootName }
-          .forEach { mustacheIncludeProcessor.processRootPdfFile(it) }
+        syncedTabbedRootNames.forEach { mustacheIncludeProcessor.processRootPdfFile(it) }
+        ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
+          .mustacheFileContentChangedSecondStep(syncedTabbedRootNames)
       }
     )
   }
 
   private fun tryUpdateTabbedPane() {
-//    println("\n\nTRYUpdateTabbedPane FOR " + mustacheFile.name)
-//    println("tabRootAware")
     val updatedRoots = mustacheIncludeProcessor.getRootsForMustacheFile(mustacheFile)
-//    println("updatedRoots")
-//    println(updatedRoots)
     val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableList()
-//    println("syncedTabbedRootNames")
-//    println(syncedTabbedRootNames)
 
     val livingRoots = syncedTabbedRootNames.intersect(updatedRoots)
     val expiredRoots = syncedTabbedRootNames.subtract(updatedRoots)
     val newRoots = updatedRoots.subtract(syncedTabbedRootNames.toImmutableSet())
 
-//    println("livingRoots")
-//    println(livingRoots)
-//    println("expiredRoots")
-//    println(expiredRoots)
-//    println("newRoots")
-//    println(newRoots)
-
     // if source fileRoots intersects this PdfFileEditorWrapper target fileRoots
     // then the mustache file that was modified impacted
     livingRoots.forEach { mustacheIncludeProcessor.processRootPdfFile(it) }
+    ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
+      .mustacheFileContentChangedSecondStep(livingRoots)
 
     // remove roots not needed anymore
     var i = 0
     while (i < syncedTabbedEditors.size) {
       if (expiredRoots.contains(syncedTabbedEditors[i].rootName)) {
-//        println("removing " + syncedTabbedEditors[i].rootName)
         jbTabbedPane.remove(i)
         Disposer.dispose(syncedTabbedEditors[i])
         syncedTabbedEditors.removeAt(i)
