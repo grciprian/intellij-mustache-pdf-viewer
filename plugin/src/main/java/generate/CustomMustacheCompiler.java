@@ -11,8 +11,8 @@ import java.io.StringReader;
 import java.util.function.BiFunction;
 import java.util.regex.Pattern;
 
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX;
-import static generate.Utils.MUSTACHE_DEFAULT_SUFFIX;
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_SUFFIX;
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.RESOURCES_WITH_MUSTACHE_PREFIX_PATH;
 
 public class CustomMustacheCompiler {
 
@@ -20,7 +20,7 @@ public class CustomMustacheCompiler {
     "<span style=\"color: red !important;\">[" + type.name() + ">" + name + "]</span>";
   private static final String FAULTY_HTML_REGEX_MATCHER = "<span style=\"color: red !important;\">\\[FAULTY_VAR>.*?\\]<\\/span>";
   private static final Mustache.TemplateLoader TEMPLATE_LOADER = name -> {
-    var file = new File(FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX, name + "." + MUSTACHE_DEFAULT_SUFFIX);
+    var file = new File(RESOURCES_WITH_MUSTACHE_PREFIX_PATH, name + "." + MUSTACHE_SUFFIX);
     if (!file.exists()) {
       return new StringReader(DO_FAULTY_HTML_MESSAGE.apply(CustomMustacheCompiler.FaultyType.FAULTY_PARTIAL, name));
     }

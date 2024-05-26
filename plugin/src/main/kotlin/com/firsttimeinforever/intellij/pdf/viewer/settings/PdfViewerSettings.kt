@@ -11,8 +11,6 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.messages.Topic
 import com.intellij.util.xmlb.XmlSerializerUtil.copyBean
-import java.nio.file.Files
-import java.nio.file.Path
 import java.util.*
 
 @State(name = "PdfViewerSettings", storages = [(Storage("pdf_viewer.xml"))])
@@ -23,28 +21,29 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
   var customForegroundColor: Int = defaultForegroundColor.rgb
   var customIconColor: Int = defaultIconColor.rgb
   var enableDocumentAutoReload = true
-  var documentColorsInvertIntensity: Int = defaultDocumentColorsInvertIntensity
+  var documentColorsInvertIntensity: Int = DEFAULT_DOCUMENT_COLORS_INVERT_INTENSITY
   var invertDocumentColors = false
   var invertColorsWithTheme = false
 
   var defaultSidebarViewMode: SidebarViewMode = SidebarViewMode.THUMBNAILS
 
   var customMustacheFontsPath: String = Optional.ofNullable(ProjectUtil.getActiveProject()?.basePath)
-    .map { "$it/$defaultFontsPath" }
-    .map {
-      val filePath = Path.of(it)
-      return@map if (Files.exists(filePath) && Files.isDirectory(filePath)) it else ""
-    }
+    .map { "$it/$DEFAULT_MUSTACHE_FONTS_PATH" }
+//    .map {
+//      val filePath = Path.of(it)
+//      return@map if (Files.exists(filePath) && Files.isDirectory(filePath)) it else ""
+//    }
     .orElse("")
-
+  var customMustachePrefix = DEFAULT_MUSTACHE_PREIFX
+  var customMustacheSuffix = DEFAULT_MUSTACHE_SUFFIX
   var isVerticalSplit = true
 
   fun notifySettingsListeners() {
     ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_SETTINGS).settingsChanged(this)
   }
 
-  fun notifySettingsFontsPathListeners() {
-    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_SETTINGS_FONTS_PATH).fontsPathChanged(this)
+  fun notifyMustacheFontsPathSettingsListeners() {
+    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE).fontsPathChanged(this)
   }
 
   override fun getState() = this
@@ -55,7 +54,7 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
 
   companion object {
     val TOPIC_SETTINGS = Topic(PdfViewerSettingsListener::class.java)
-    val TOPIC_SETTINGS_FONTS_PATH = Topic(PdfViewerSettingsFontsPathListener::class.java)
+    val TOPIC_MUSTACHE = Topic(PdfViewerMustacheFontsPathSettingsListener::class.java)
 
     val instance: PdfViewerSettings
       get() = service()
@@ -69,9 +68,15 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
     val defaultIconColor
       get() = defaultForegroundColor
 
-    const val defaultDocumentColorsInvertIntensity = 85
+    const val DEFAULT_DOCUMENT_COLORS_INVERT_INTENSITY = 85
 
-    const val defaultFontsPath = "fonts"
+    const val DEFAULT_MUSTACHE_FONTS_PATH = "fonts"
+
+    const val DEFAULT_MUSTACHE_PREIFX = "templates"
+
+    const val DEFAULT_MUSTACHE_SUFFIX = "mustache"
+
+//    val ILLEGAL_CHARACTERS_REGEX: Pattern = Pattern.compile("[\\/\\n\\r\\t\\u0000\\f`\\?\\*\\\\<>|\\\":]\n")
 
     val enableExperimentalFeatures: Boolean
       get() = Registry.`is`("pdf.viewer.enableExperimentalFeatures")

@@ -21,6 +21,8 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
         settings.customBackgroundColor != customBackgroundColor.get() ||
         settings.customIconColor != customIconColor.get() ||
         settings.customMustacheFontsPath != customMustacheFontsPath.get() ||
+        settings.customMustachePrefix != customMustachePrefix.get() ||
+        settings.customMustacheSuffix != customMustacheSuffix.get() ||
         settings.isVerticalSplit != isVerticalSplit.get()
     } ?: false
   }
@@ -29,7 +31,7 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
 
   override fun apply() {
     val wasSettingsModified = isModified
-    val wasFontsPathModified = settings.customMustacheFontsPath != settingsForm?.customMustacheFontsPath?.get()
+    val wasMustacheFontsPathModified = settings.customMustacheFontsPath != settingsForm?.customMustacheFontsPath?.get()
     settings.run {
       enableDocumentAutoReload = settingsForm?.enableDocumentAutoReload?.get() ?: enableDocumentAutoReload
       defaultSidebarViewMode = settingsForm?.defaultSidebarViewMode?.get() ?: defaultSidebarViewMode
@@ -40,14 +42,16 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
       customBackgroundColor = settingsForm?.customBackgroundColor?.get() ?: customBackgroundColor
       customForegroundColor = settingsForm?.customForegroundColor?.get() ?: customForegroundColor
       customIconColor = settingsForm?.customIconColor?.get() ?: customIconColor
-      customMustacheFontsPath = settingsForm?.customMustacheFontsPath?.get() ?: (project.basePath ?: "")
+      customMustacheFontsPath = settingsForm?.customMustacheFontsPath?.get() ?: customMustacheFontsPath
+      customMustachePrefix = settingsForm?.customMustachePrefix?.get() ?: customMustachePrefix
+      customMustacheSuffix = settingsForm?.customMustacheSuffix?.get() ?: customMustacheSuffix
       isVerticalSplit = settingsForm?.isVerticalSplit?.get() ?: isVerticalSplit
     }
     if (wasSettingsModified) {
       settings.notifySettingsListeners()
     }
-    if (wasFontsPathModified) {
-      settings.notifySettingsFontsPathListeners()
+    if (wasMustacheFontsPathModified) {
+      settings.notifyMustacheFontsPathSettingsListeners()
     }
   }
 

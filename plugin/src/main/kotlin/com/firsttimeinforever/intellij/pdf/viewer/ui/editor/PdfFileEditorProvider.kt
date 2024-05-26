@@ -1,6 +1,7 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
 import com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType
+import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings.Companion.instance
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditor
@@ -10,8 +11,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
-import generate.Utils.MUSTACHE_DEFAULT_SUFFIX
-import generate.Utils.getFileResourcesPathWithPrefix
+import generate.Utils.getResourcesWithMustachePrefixPath
 
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
@@ -22,12 +22,14 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   override fun getEditorTypeId() = PDF
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
-    try {
-      FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX = getFileResourcesPathWithPrefix(project, file)
-      return file.fileType == PdfFileType || (mainProvider.accept(project, file) && file.extension == MUSTACHE_DEFAULT_SUFFIX)
+    return try {
+      MUSTAHCE_PREFIX = instance.customMustachePrefix
+      MUSTACHE_SUFFIX = instance.customMustacheSuffix
+      RESOURCES_WITH_MUSTACHE_PREFIX_PATH = getResourcesWithMustachePrefixPath(project, file)
+      file.fileType == PdfFileType || (mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX)
     } catch (e: Exception) {
       // log maybe? or not
-      return false
+      false
     }
   }
 
@@ -43,7 +45,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
         if (file.fileType == PdfFileType) {
           pdfFileEditor = PdfFileEditor(project, file)
           return pdfFileEditor as PdfFileEditor
-        } else if (mainProvider.accept(project, file) && file.extension == MUSTACHE_DEFAULT_SUFFIX) {
+        } else if (mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX) {
           mustacheFileEditor = MustacheFileEditor(project, file)
           return (mustacheFileEditor as MustacheFileEditor).getTextEditorWithPreview()
         }
@@ -62,4 +64,6 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   }
 }
 
-lateinit var FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX: String
+lateinit var MUSTACHE_SUFFIX: String
+lateinit var MUSTAHCE_PREFIX: String
+lateinit var RESOURCES_WITH_MUSTACHE_PREFIX_PATH: String

@@ -1,8 +1,8 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
+import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFontsPathSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
-import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettingsFontsPathListener
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MustacheFileEditor.Companion.MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
@@ -38,8 +38,8 @@ class PdfFileEditorWrapper(
         tryUpdateTabbedPane()
       })
     messageBusConnection.subscribe(
-      PdfViewerSettings.TOPIC_SETTINGS_FONTS_PATH,
-      PdfViewerSettingsFontsPathListener {
+      PdfViewerSettings.TOPIC_MUSTACHE,
+      PdfViewerMustacheFontsPathSettingsListener {
         val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableSet()
         mustacheIncludeProcessor.tryInvalidateRootPdfFilesForMustacheFileRoots(syncedTabbedRootNames)
         syncedTabbedRootNames.forEach { mustacheIncludeProcessor.processRootPdfFile(it) }
@@ -60,8 +60,6 @@ class PdfFileEditorWrapper(
     // if source fileRoots intersects this PdfFileEditorWrapper target fileRoots
     // then the mustache file that was modified impacted
     livingRoots.forEach { mustacheIncludeProcessor.processRootPdfFile(it) }
-    ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
-      .mustacheFileContentChangedSecondStep(livingRoots)
 
     // remove roots not needed anymore
     var i = 0
@@ -77,6 +75,10 @@ class PdfFileEditorWrapper(
 
     // add new identified root files
     newRoots.forEach { rootName -> addPdfFileEditorTab(rootName) }
+
+    // refresh living roots tabs
+    ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
+      .mustacheFileContentChangedSecondStep(livingRoots)
   }
 
   private fun addPdfFileEditorTab(rootName: String) {

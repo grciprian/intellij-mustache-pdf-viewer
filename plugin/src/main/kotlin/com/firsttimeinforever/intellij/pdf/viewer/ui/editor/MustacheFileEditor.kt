@@ -52,7 +52,7 @@ class MustacheFileEditor(
       // if the file modified is the current opened editor file then reprocess the pdf file
       // and announce the correspondent PdfFileEditor to reload
       if (events.any {
-          it.file == editor.file && it.file?.canonicalPath?.indexOf(FILE_RESOURCES_PATH_WITH_MUSTACHE_PREFIX, 0, false) == 0
+          it.file == editor.file && it.file?.canonicalPath?.indexOf(RESOURCES_WITH_MUSTACHE_PREFIX_PATH, 0, false) == 0
         }) {
         println("processFileIncludePropsMap after any files modification under resources folder")
         mustacheIncludeProcessor.processFileIncludePropsMap()

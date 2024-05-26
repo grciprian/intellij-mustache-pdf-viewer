@@ -25,6 +25,8 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
   val enableDocumentAutoReload = properties.property(settings.enableDocumentAutoReload)
   val defaultSidebarViewMode = properties.property(settings.defaultSidebarViewMode)
   val customMustacheFontsPath = properties.property(settings.customMustacheFontsPath)
+  val customMustachePrefix = properties.property(settings.customMustachePrefix)
+  val customMustacheSuffix = properties.property(settings.customMustacheSuffix)
   val isVerticalSplit = properties.property(settings.isVerticalSplit)
 
   private val generalSettingsGroup = panel {
@@ -46,17 +48,36 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
         comboBox(DefaultComboBoxModel(SidebarViewMode.values()), renderer)
           .bindItem(defaultSidebarViewMode)
       }
+    }
+  }
+
+  private val mustacheSettingsGroup = panel {
+    group(PdfViewerBundle.message("pdf.viewer.settings.group.mustache")) {
       row(PdfViewerBundle.message("pdf.viewer.settings.mustache.fonts.path")) {
         val folderDescriptor = FileChooserDescriptor(false, true, false, false, false, false)
         textFieldWithBrowseButton(null, project, folderDescriptor, null)
           .bindText(customMustacheFontsPath)
+      }
+      row(PdfViewerBundle.message("pdf.viewer.settings.mustache.prefix")) {
+        textField()
+//          .addValidationRule("") {
+//            PdfViewerSettings.ILLEGAL_CHARACTERS_REGEX.matcher(it.text).find()
+//          }
+          .bindText(customMustachePrefix)
+      }
+      row(PdfViewerBundle.message("pdf.viewer.settings.mustache.suffix")) {
+        textField()
+//          .addValidationRule("") {
+//            PdfViewerSettings.ILLEGAL_CHARACTERS_REGEX.matcher(it.text).find()
+//          }
+          .bindText(customMustacheSuffix)
       }
       row(PdfViewerBundle.message("pdf.viewer.settings.mustache.preview.layout.label")) {
         comboBox(
           model = DefaultComboBoxModel(arrayOf(false, true)),
           renderer = SimpleListCellRenderer.create("", ::presentSplitLayout)
         ).bindItem(isVerticalSplit)
-      }.bottomGap(BottomGap.SMALL)
+      }
     }
   }
 
@@ -144,6 +165,7 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
     layout = BorderLayout()
     add(panel {
       row { cell(generalSettingsGroup).align(AlignX.FILL) }
+      row { cell(mustacheSettingsGroup).align(AlignX.FILL) }
       row { cell(invertColorsGroup).align(AlignX.FILL) }
       row { cell(customColorsGroup).align(AlignX.FILL) }
     })
