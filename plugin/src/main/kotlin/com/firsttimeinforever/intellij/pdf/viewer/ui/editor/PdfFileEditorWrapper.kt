@@ -82,8 +82,8 @@ class PdfFileEditorWrapper(
   }
 
   private fun addPdfFileEditorTab(rootName: String) {
-    val processedPdfFile = mustacheIncludeProcessor.processRootPdfFile(rootName)
-    val editor = PdfFileEditor(project, processedPdfFile, rootName)
+    val pdfFile = mustacheIncludeProcessor.processRootPdfFile(rootName)
+    val editor = PdfFileEditor(project, pdfFile, rootName)
     Disposer.register(this, editor)
     jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
     syncedTabbedEditors.add(ADD_INDEX_FOR_NEW_TAB, editor)

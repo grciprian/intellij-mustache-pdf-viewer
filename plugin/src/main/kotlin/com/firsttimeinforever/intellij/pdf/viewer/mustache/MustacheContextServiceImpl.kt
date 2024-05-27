@@ -14,8 +14,10 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
+import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
 import generate.MustacheIncludeProcessor
-import generate.Utils.*
+import generate.Utils.MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX
+import generate.Utils.isFileUnderResourcesPathWithPrefix
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -58,8 +60,11 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
             return@any (checkFilePathWithFontsPathBasedOnFileType(it.oldPath, isDirectory)
               || checkFilePathWithFontsPathBasedOnFileType(it.newPath, isDirectory))
           }
-          val filePath = file.canonicalPath ?: ""
-          return@any checkFilePathWithFontsPathBasedOnFileType(filePath, isDirectory)
+          if (it is VFilePropertyChangeEvent) {
+            return@any (checkFilePathWithFontsPathBasedOnFileType(it.oldPath, isDirectory)
+              || checkFilePathWithFontsPathBasedOnFileType(it.newPath, isDirectory))
+          }
+          return@any checkFilePathWithFontsPathBasedOnFileType(file.canonicalPath ?: "", isDirectory)
         }) {
         settings.notifyMustacheFontsPathSettingsListeners()
       }

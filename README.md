@@ -107,5 +107,4 @@ This plugin is still in it's early stage, so some major bugs can occur.
 
 ### TODO
 
-- refresh pdf preview editors when changing fonts folder name
 - make perfomance better reusing pdf editors from a cache(map), do not spawn multiple editors with the same pdf for different mustache files
