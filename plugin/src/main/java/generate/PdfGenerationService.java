@@ -11,10 +11,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities;
 
 import java.awt.*;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 
 public class PdfGenerationService {
@@ -39,18 +36,20 @@ public class PdfGenerationService {
     return PdfGenerationService.instance;
   }
 
-  public byte[] generatePdf(Object model, String templateContent) {
+  public Pdf generatePdf(Object model, String templateContent) {
     try (var outputStream = new ByteArrayOutputStream()) {
-      writePdfContentToStream(outputStream, getHtml(model, templateContent));
+      var visitor = new JBMustacheTreeProducerVisitor();
+      var html = getHtml(model, templateContent, visitor);
+      writePdfContentToStream(outputStream, html);
       var pdf = outputStream.toByteArray();
       if (pdf.length == 0) {
         throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
       }
-      return outputStream.toByteArray();
+      return new Pdf(outputStream.toByteArray(), visitor.getKeys().toString());
     } catch (Exception e) {
       try (var os = new ByteArrayOutputStream()) {
         writePdfContentToStream(os, getHtml(new ErrorObject(e), ERROR_HTML));
-        return os.toByteArray();
+        return new Pdf(os.toByteArray(), "");
       } catch (Exception ex) {
         throw new RuntimeException(PDF_GENERATION_ERROR, ex);
       }
@@ -67,9 +66,13 @@ public class PdfGenerationService {
   }
 
   private String getHtml(Object model, String templateContent) {
-    return mustacheCompiler
-      .compile(templateContent)
-      .execute(model);
+    return mustacheCompiler.compile(templateContent).execute(model);
+  }
+
+  private String getHtml(Object model, String templateContent, Mustache.Visitor visitor) {
+    var template = mustacheCompiler.compile(templateContent);
+    template.visit(visitor);
+    return template.execute(model);
   }
 
   private Document convertHtmlToXHtml(String pdfContent) {
@@ -116,4 +119,6 @@ public class PdfGenerationService {
     }
   }
 
+  public record Pdf(byte[] content, String structure) {
+  }
 }

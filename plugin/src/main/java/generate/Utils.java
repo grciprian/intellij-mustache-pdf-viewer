@@ -60,12 +60,13 @@ public class Utils {
       var path = Path.of(fileResourcesPathWithMustachePrefix + simpleFilename + "." + MUSTACHE_SUFFIX);
       var virtualFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(virtualFile, "virtualFile for getPdfFile should not be null! Path: " + path);
-      var pdfByteArray = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(virtualFile));
+      var pdf = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(virtualFile));
       var outputPath = Path.of(simpleFilename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX); // mtf MustacheTemporaryFile
       if (!Files.exists(outputPath)) {
         Files.createFile(outputPath);
       }
-      Files.write(outputPath, pdfByteArray);
+      System.out.println(pdf.structure());
+      Files.write(outputPath, pdf.content());
       return VfsUtil.findFile(outputPath, true);
     } catch (IOException exception) {
       throw new RuntimeException("Could not process mustache file into PDF file: " + exception.getMessage());
