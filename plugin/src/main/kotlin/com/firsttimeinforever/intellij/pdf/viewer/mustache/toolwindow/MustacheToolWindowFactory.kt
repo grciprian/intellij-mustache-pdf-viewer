@@ -4,18 +4,14 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
-import com.intellij.ui.TreeExpandCollapse
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
-import com.intellij.ui.treeStructure.Tree
 import org.jetbrains.annotations.NotNull
 import java.awt.BorderLayout
 import javax.swing.BorderFactory
 import javax.swing.ImageIcon
 import javax.swing.JLabel
 import javax.swing.JPanel
-import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeModel
 
 class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
@@ -39,7 +35,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
     private fun createTree(): JBScrollPane {
       val treePanel = JBScrollPane()
 
-      TreeExpandCollapse.expandAll(tree)
+//      TreeExpandCollapse.expandAll(tree)
       return treePanel
     }
 

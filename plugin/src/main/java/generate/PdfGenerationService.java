@@ -11,7 +11,10 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities;
 
 import java.awt.*;
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 public class PdfGenerationService {
@@ -45,7 +48,7 @@ public class PdfGenerationService {
       if (pdf.length == 0) {
         throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
       }
-      return new Pdf(outputStream.toByteArray(), visitor.getKeys().toString());
+      return new Pdf(outputStream.toByteArray(), "visitor");
     } catch (Exception e) {
       try (var os = new ByteArrayOutputStream()) {
         writePdfContentToStream(os, getHtml(new ErrorObject(e), ERROR_HTML));

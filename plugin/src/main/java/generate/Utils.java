@@ -1,6 +1,7 @@
 package generate;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -10,8 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_SUFFIX;
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTAHCE_PREFIX;
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.*;
 import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
 import static java.util.Collections.EMPTY_MAP;
 
@@ -44,20 +44,23 @@ public class Utils {
     }
   }
 
-  public static String getRelativePathFromResourcePathWithPrefix(String fileResourcesPathWithMustachePrefix, VirtualFile virtualFile) {
-    return getRelativePathFromResourcePathWithPrefix(fileResourcesPathWithMustachePrefix, virtualFile.getCanonicalPath());
-  }
-
-  public static String getRelativePathFromResourcePathWithPrefix(String fileResourcesPathWithMustachePrefix, String canonicalPath) {
+  public static String getRelativePathFromResourcePathWithMustachePrefixPath(VirtualFile virtualFile) {
+    var canonicalPath = virtualFile.getCanonicalPath();
     Objects.requireNonNull(canonicalPath, "Could not getRelativePathFromResourcePathWithPrefix because canonicalPath of virtualFile is null!");
-    var indexOfSuffix = canonicalPath.indexOf("." + MUSTACHE_SUFFIX);
-    if (indexOfSuffix == -1) indexOfSuffix = canonicalPath.length();
-    return canonicalPath.substring(fileResourcesPathWithMustachePrefix.length(), indexOfSuffix);
+    var extensionPointIndex = StringUtilRt.lastIndexOf(canonicalPath, '.', 0, canonicalPath.length());
+    if (extensionPointIndex < 0) {
+      return null;
+    }
+    var extension = canonicalPath.subSequence(extensionPointIndex + 1, canonicalPath.length());
+    if(extension != MUSTACHE_SUFFIX) {
+      return null;
+    }
+    return canonicalPath.substring(RESOURCES_WITH_MUSTACHE_PREFIX_PATH.length(), extensionPointIndex);
   }
 
-  public static VirtualFile getPdfFile(String fileResourcesPathWithMustachePrefix, String simpleFilename) {
+  public static VirtualFile getPdfFile(String simpleFilename) {
     try {
-      var path = Path.of(fileResourcesPathWithMustachePrefix + simpleFilename + "." + MUSTACHE_SUFFIX);
+      var path = Path.of(RESOURCES_WITH_MUSTACHE_PREFIX_PATH + simpleFilename + "." + MUSTACHE_SUFFIX);
       var virtualFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(virtualFile, "virtualFile for getPdfFile should not be null! Path: " + path);
       var pdf = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(virtualFile));
