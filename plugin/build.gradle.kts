@@ -30,6 +30,7 @@ repositories {
   maven("https://repo1.maven.org/maven2/")
   maven("https://www.jetbrains.com/intellij-repository/snapshots")
   // maven("http://maven.geotoolkit.org/")
+  mavenLocal()
 }
 
 dependencies {
@@ -48,7 +49,7 @@ dependencies {
     exclude("org.jetbrains.kotlinx", "kotlinx-serialization-json")
   }
   // https://mvnrepository.com/artifact/com.samskivert/jmustache
-  implementation("com.samskivert:jmustache:1.16")
+  implementation("com.samskivert:jmustache:1.18")
   // https://mvnrepository.com/artifact/com.itextpdf/itext7-core
   implementation("com.itextpdf:itext7-core:8.0.3")
   // https://mvnrepository.com/artifact/org.jsoup/jsoup

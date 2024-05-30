@@ -15,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 
 public class PdfGenerationService {
@@ -74,6 +75,16 @@ public class PdfGenerationService {
 
   private String getHtml(Object model, String templateContent, Mustache.Visitor visitor) {
     var template = mustacheCompiler.compile(templateContent);
+
+    try {
+      Class myClass = template.getClass();
+      Field myField = getField(myClass, "_segs");
+      myField.setAccessible(true); //required if field is not normally accessible
+      System.out.println("value: " + myField.get(template));
+    } catch (Exception e) {
+      System.out.println("buba");
+    }
+
     template.visit(visitor);
     return template.execute(model);
   }
@@ -123,5 +134,18 @@ public class PdfGenerationService {
   }
 
   public record Pdf(byte[] content, String structure) {
+  }
+
+  private static Field getField(Class clazz, String fieldName) throws NoSuchFieldException {
+    try {
+      return clazz.getDeclaredField(fieldName);
+    } catch (NoSuchFieldException e) {
+      Class superClass = clazz.getSuperclass();
+      if (superClass == null) {
+        throw e;
+      } else {
+        return getField(superClass, fieldName);
+      }
+    }
   }
 }

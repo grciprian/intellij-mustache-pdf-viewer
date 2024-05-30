@@ -95,6 +95,12 @@ public class MustacheIncludeProcessor {
 
   public Set<String> getRootsForMustacheFile(VirtualFile mustacheFile) {
     var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(mustacheFile);
+    System.out.println("mustacheFile");
+    System.out.println(mustacheFile);
+    System.out.println("includePropsMap");
+    System.out.println(includePropsMap);
+    System.out.println("relativePath");
+    System.out.println(relativePath);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())

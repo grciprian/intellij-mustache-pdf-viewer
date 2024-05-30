@@ -52,7 +52,7 @@ public class Utils {
       return null;
     }
     var extension = canonicalPath.subSequence(extensionPointIndex + 1, canonicalPath.length());
-    if(extension != MUSTACHE_SUFFIX) {
+    if(!MUSTACHE_SUFFIX.contentEquals(extension)) {
       return null;
     }
     return canonicalPath.substring(RESOURCES_WITH_MUSTACHE_PREFIX_PATH.length(), extensionPointIndex);
