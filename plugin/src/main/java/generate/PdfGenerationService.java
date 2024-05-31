@@ -10,13 +10,14 @@ import org.jsoup.helper.W3CDom;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities;
 
-import java.awt.*;
+import java.awt.Font;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 public class PdfGenerationService {
 
@@ -40,27 +41,20 @@ public class PdfGenerationService {
     return PdfGenerationService.instance;
   }
 
-  public Pdf generatePdf(Object model, String templateContent) {
-    try (var outputStream = new ByteArrayOutputStream()) {
-      var visitor = new JBMustacheTreeProducerVisitor();
-      var html = getHtml(model, templateContent, visitor);
-      writePdfContentToStream(outputStream, html);
-      var pdf = outputStream.toByteArray();
-      if (pdf.length == 0) {
-        throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
-      }
-      return new Pdf(outputStream.toByteArray(), "visitor");
-    } catch (Exception e) {
-      try (var os = new ByteArrayOutputStream()) {
-        writePdfContentToStream(os, getHtml(new ErrorObject(e), ERROR_HTML));
-        return new Pdf(os.toByteArray(), "");
-      } catch (Exception ex) {
-        throw new RuntimeException(PDF_GENERATION_ERROR, ex);
+  private static Field getField(Class clazz, String fieldName) throws NoSuchFieldException {
+    try {
+      return clazz.getDeclaredField(fieldName);
+    } catch (NoSuchFieldException e) {
+      Class superClass = clazz.getSuperclass();
+      if (superClass == null) {
+        throw e;
+      } else {
+        return getField(superClass, fieldName);
       }
     }
   }
 
-  private void writePdfContentToStream(OutputStream outputStream, String html) throws IOException {
+  private static void writePdfContentToStream(OutputStream outputStream, String html) throws IOException {
     var builder = new PdfRendererBuilder();
     var document = convertHtmlToXHtml(html);
     builder.toStream(outputStream);
@@ -69,33 +63,13 @@ public class PdfGenerationService {
     builder.run();
   }
 
-  private String getHtml(Object model, String templateContent) {
-    return mustacheCompiler.compile(templateContent).execute(model);
-  }
-
-  private String getHtml(Object model, String templateContent, Mustache.Visitor visitor) {
-    var template = mustacheCompiler.compile(templateContent);
-
-    try {
-      Class myClass = template.getClass();
-      Field myField = getField(myClass, "_segs");
-      myField.setAccessible(true); //required if field is not normally accessible
-      System.out.println("value: " + myField.get(template));
-    } catch (Exception e) {
-      System.out.println("buba");
-    }
-
-    template.visit(visitor);
-    return template.execute(model);
-  }
-
-  private Document convertHtmlToXHtml(String pdfContent) {
+  private static Document convertHtmlToXHtml(String pdfContent) {
     var document = Jsoup.parse(pdfContent);
     document.outputSettings().syntax(Document.OutputSettings.Syntax.xml).escapeMode(Entities.EscapeMode.xhtml).charset(StandardCharsets.UTF_8);
     return document;
   }
 
-  private void addFonts(PdfRendererBuilder pdfRendererBuilder) {
+  private static void addFonts(PdfRendererBuilder pdfRendererBuilder) {
     var f = new File(PdfViewerSettings.Companion.getInstance().getCustomMustacheFontsPath());
     if (f.isDirectory()) {
       var files = f.listFiles((dir, name) -> {
@@ -111,6 +85,26 @@ public class PdfGenerationService {
             logger.error("Font could not be loaded: " + file.getName());
           }
         }
+      }
+    }
+  }
+
+  public Pdf generatePdf(Object model, String templateContent) {
+    try (var outputStream = new ByteArrayOutputStream()) {
+      var template = mustacheCompiler.compile(templateContent);
+      var html = template.execute(model);
+      writePdfContentToStream(outputStream, html);
+      var pdf = outputStream.toByteArray();
+      if (pdf.length == 0) {
+        throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
+      }
+      return new Pdf(outputStream.toByteArray(), "visitor");
+    } catch (Exception e) {
+      try (var os = new ByteArrayOutputStream()) {
+        writePdfContentToStream(os, mustacheCompiler.compile(ERROR_HTML).execute(new ErrorObject(e)));
+        return new Pdf(os.toByteArray(), List.of());
+      } catch (Exception ex) {
+        throw new RuntimeException(PDF_GENERATION_ERROR, ex);
       }
     }
   }
@@ -133,19 +127,6 @@ public class PdfGenerationService {
     }
   }
 
-  public record Pdf(byte[] content, String structure) {
-  }
-
-  private static Field getField(Class clazz, String fieldName) throws NoSuchFieldException {
-    try {
-      return clazz.getDeclaredField(fieldName);
-    } catch (NoSuchFieldException e) {
-      Class superClass = clazz.getSuperclass();
-      if (superClass == null) {
-        throw e;
-      } else {
-        return getField(superClass, fieldName);
-      }
-    }
+  public record Pdf(byte[] content, List<PdfStructureService.Structure> structure) {
   }
 }
