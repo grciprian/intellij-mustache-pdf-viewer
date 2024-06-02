@@ -29,7 +29,8 @@
     <statusBarWidgetFactory id="com.firsttimeinforever.intellij.pdf.viewer.ui.widgets.PdfDocumentPageStatusBarWidget"
                             implementation="com.firsttimeinforever.intellij.pdf.viewer.ui.widgets.PdfDocumentPageStatusBarWidgetFactory"/>
 
-    <toolWindow id="Mustache Tool" secondary="true" icon="AllIcons.Toolwindows.WebToolWindow" anchor="right"
+    <toolWindow id="Mustache Tool"
+                icon="AllIcons.Toolwindows.ToolWindowHierarchy" anchor="right" doNotActivateOnStart="true"
                 factoryClass="com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory"/>
   </extensions>
 

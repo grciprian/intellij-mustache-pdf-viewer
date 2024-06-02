@@ -2,6 +2,7 @@ package generate;
 
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import generate.PdfGenerationService.Pdf;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -10,7 +11,7 @@ import java.util.stream.Collectors;
 
 import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.RESOURCES_WITH_MUSTACHE_PREFIX_PATH;
 import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
-import static generate.Utils.getPdfFile;
+import static generate.Utils.getPdf;
 import static generate.Utils.getRelativePathFromResourcePathWithMustachePrefixPath;
 
 public class MustacheIncludeProcessor {
@@ -93,50 +94,49 @@ public class MustacheIncludeProcessor {
       .forEach(rootPdfFileMap::remove);
   }
 
-  public Set<String> getRootsForMustacheFile(VirtualFile mustacheFile) {
-    var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(mustacheFile);
-    System.out.println("mustacheFile");
-    System.out.println(mustacheFile);
-    System.out.println("includePropsMap");
-    System.out.println(includePropsMap);
-    System.out.println("relativePath");
-    System.out.println(relativePath);
+  public Set<String> getRootsForMustache(VirtualFile file) {
+    var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(file);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
-      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + mustacheFile.getCanonicalPath()));
+      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getCanonicalPath()));
   }
 
-  public void tryInvalidateRootPdfFilesForMustacheFileRoots(Set<String> mustacheFileRoots) {
-    mustacheFileRoots.stream()
+  public void tryInvalidateRootPdfsForMustacheRoots(Set<String> roots) {
+    roots.stream()
       .filter(rootPdfFileMap::containsKey)
       .forEach(v -> Optional.ofNullable(rootPdfFileMap.get(v)).ifPresent(t -> t.expired = true));
   }
 
-  public VirtualFile processRootPdfFile(String rootName) {
-    if (rootPdfFileMap.get(rootName) == null || rootPdfFileMap.get(rootName).expired) {
-      var pdfFile = getPdfFile(rootName);
-      rootPdfFileMap.put(rootName, new PdfFileExpirationWrapper(pdfFile));
+  public VirtualFile processRootPdfFile(String root) {
+    if (rootPdfFileMap.get(root) == null || rootPdfFileMap.get(root).expired) {
+      var pdf = getPdf(root);
+      rootPdfFileMap.put(root, new PdfFileExpirationWrapper(pdf));
     }
-    return rootPdfFileMap.get(rootName).pdfFile; // same as pdfFile
+    return rootPdfFileMap.get(root).pdf.file();
   }
 
+  // maybe rethink this flow
   public String getRootForPdfFile(VirtualFile pdfFile) {
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
-      .filter(entry -> Objects.equals(entry.getValue().pdfFile.getCanonicalPath(), pdfFile.getCanonicalPath()))
+      .filter(entry -> Objects.equals(entry.getValue().pdf.file().getCanonicalPath(), pdfFile.getCanonicalPath()))
       .findAny()
       .map(Map.Entry::getKey)
       .orElseThrow(() -> new RuntimeException("No root key found for pdfFile with canonical path: " + pdfFile.getCanonicalPath()));
   }
 
-  public static class PdfFileExpirationWrapper {
+  public Pdf getPdfForRoot(String root) {
+    if(!rootPdfFileMap.containsKey(root)) throw new RuntimeException("The root provided may not actually be a root!");
+    return rootPdfFileMap.get(root).pdf;
+  }
 
-    VirtualFile pdfFile;
+  public static class PdfFileExpirationWrapper {
+    Pdf pdf;
     boolean expired;
 
-    PdfFileExpirationWrapper(VirtualFile pdfFile) {
-      this.pdfFile = pdfFile;
+    PdfFileExpirationWrapper(Pdf pdf) {
+      this.pdf = pdf;
       this.expired = false;
     }
   }

@@ -1,5 +1,6 @@
 package com.firsttimeinforever.intellij.pdf.viewer.mustache
 
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
@@ -15,6 +16,7 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
+import com.intellij.openapi.wm.ToolWindowManager
 import generate.MustacheIncludeProcessor
 import generate.Utils.MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX
 import generate.Utils.isFileUnderResourcesPathWithPrefix
@@ -35,6 +37,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     println("MustacheContextServiceImpl initialized for " + project.name)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     ApplicationManager.getApplication().messageBus.connect().subscribe(AppLifecycleListener.TOPIC, myAppLifecycleListener)
+    val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
+    toolWindow?.setAvailable(true, null)
   }
 
   private inner class FileChangedListener : BulkFileListener {
@@ -78,7 +82,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       cleanupMtfPdf()
     }
 
-    fun cleanupMtfPdf() {
+    private fun cleanupMtfPdf() {
       val root = VfsUtil.findFile(Path.of("./"), true) as VirtualFile
       VfsUtil.processFileRecursivelyWithoutIgnored(root) {
         if (it.isDirectory) return@processFileRecursivelyWithoutIgnored true

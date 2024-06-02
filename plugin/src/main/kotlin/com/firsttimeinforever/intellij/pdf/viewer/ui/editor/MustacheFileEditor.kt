@@ -57,12 +57,12 @@ class MustacheFileEditor(
         println("processFileIncludePropsMap after any files modification under resources folder")
         mustacheIncludeProcessor.processFileIncludePropsMap()
         println("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
-        val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustacheFile(editor.file)
-        mustacheIncludeProcessor.tryInvalidateRootPdfFilesForMustacheFileRoots(updatedMustacheFileRoots)
+        val mustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(editor.file)
+        mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(mustacheFileRoots)
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
           .mustacheFileContentChangedFirstStep()
         ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
-          .mustacheFileContentChangedSecondStep(updatedMustacheFileRoots)
+          .mustacheFileContentChangedSecondStep(mustacheFileRoots)
       }
     }
   }
@@ -95,7 +95,7 @@ class MustacheFileEditor(
   companion object {
     val MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC = Topic(MustacheFileListenerFirstStep::class.java)
     val MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC = Topic(MustacheFileListenerSecondStep::class.java)
-    private const val NAME = "Mustache Viewer File Editor With Preview"
+    const val NAME = "Mustache Viewer File Editor With Preview"
     private val logger = logger<MustacheFileEditor>()
   }
 

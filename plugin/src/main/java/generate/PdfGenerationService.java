@@ -2,20 +2,21 @@ package generate;
 
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
+import generate.PdfStructureService.Structure;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.helper.W3CDom;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities;
 
-import java.awt.Font;
+import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -31,27 +32,14 @@ public class PdfGenerationService {
   private static PdfGenerationService instance;
   private final Mustache.Compiler mustacheCompiler;
 
-  private PdfGenerationService(Mustache.Compiler compiler) {
-    this.mustacheCompiler = compiler;
+  private PdfGenerationService() {
+    this.mustacheCompiler = CustomMustacheCompiler.getInstance();
   }
 
   public static PdfGenerationService getInstance() {
-    if (PdfGenerationService.instance != null) return PdfGenerationService.instance;
-    PdfGenerationService.instance = new PdfGenerationService(CustomMustacheCompiler.getInstance());
-    return PdfGenerationService.instance;
-  }
-
-  private static Field getField(Class clazz, String fieldName) throws NoSuchFieldException {
-    try {
-      return clazz.getDeclaredField(fieldName);
-    } catch (NoSuchFieldException e) {
-      Class superClass = clazz.getSuperclass();
-      if (superClass == null) {
-        throw e;
-      } else {
-        return getField(superClass, fieldName);
-      }
-    }
+    if (instance != null) return instance;
+    instance = new PdfGenerationService();
+    return instance;
   }
 
   private static void writePdfContentToStream(OutputStream outputStream, String html) throws IOException {
@@ -89,7 +77,7 @@ public class PdfGenerationService {
     }
   }
 
-  public Pdf generatePdf(Object model, String templateContent) {
+  public PdfContent generatePdf(Object model, String templateContent) {
     try (var outputStream = new ByteArrayOutputStream()) {
       var template = mustacheCompiler.compile(templateContent);
       var html = template.execute(model);
@@ -98,11 +86,12 @@ public class PdfGenerationService {
       if (pdf.length == 0) {
         throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
       }
-      return new Pdf(outputStream.toByteArray(), "visitor");
+      var structure = PdfStructureService.getStructure(template);
+      return new PdfContent(outputStream.toByteArray(), structure);
     } catch (Exception e) {
       try (var os = new ByteArrayOutputStream()) {
         writePdfContentToStream(os, mustacheCompiler.compile(ERROR_HTML).execute(new ErrorObject(e)));
-        return new Pdf(os.toByteArray(), List.of());
+        return new PdfContent(os.toByteArray(), List.of());
       } catch (Exception ex) {
         throw new RuntimeException(PDF_GENERATION_ERROR, ex);
       }
@@ -127,6 +116,9 @@ public class PdfGenerationService {
     }
   }
 
-  public record Pdf(byte[] content, List<PdfStructureService.Structure> structure) {
+  public record PdfContent(byte[] byteArray, List<Structure> structures) {
+  }
+
+  public record Pdf(VirtualFile file, List<Structure> structures) {
   }
 }

@@ -14,7 +14,7 @@ import java.awt.GridLayout
 import javax.swing.BoxLayout
 import javax.swing.JPanel
 
-class PdfEditorViewComponent(val project: Project, val virtualFile: VirtualFile) : JPanel(), Disposable {
+class PdfEditorViewComponent(val project: Project, virtualFile: VirtualFile) : JPanel(), Disposable {
   val controlPanel = PdfEditorControlPanel()
   val controller = PdfPreviewControllerProvider.createViewController(project, virtualFile)
   val searchPanel = PdfSearchPanel(this)
