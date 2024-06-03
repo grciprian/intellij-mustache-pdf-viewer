@@ -47,7 +47,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
           return pdfFileEditor as PdfFileEditor
         } else if (mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX) {
           mustacheFileEditor = MustacheFileEditor(project, file)
-          return (mustacheFileEditor as MustacheFileEditor).getTextEditorWithPreview()
+          return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
       }

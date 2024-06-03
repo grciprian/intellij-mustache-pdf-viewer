@@ -7,6 +7,8 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.ex.EditorEventMulticasterEx
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.TextEditor
@@ -21,6 +23,8 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.messages.Topic
 import org.jetbrains.annotations.NotNull
+import java.awt.event.FocusEvent
+import java.awt.event.FocusListener
 
 class MustacheFileEditor(
   val project: @NotNull Project, val virtualFile: @NotNull VirtualFile
@@ -32,18 +36,36 @@ class MustacheFileEditor(
   private val fileChangedListener = FileChangedListener()
   private val editor = createEditorBuilder().build() as TextEditor
   private val preview = PdfFileEditorWrapper(project, virtualFile)
-  private val textEditorWithPreview = TextEditorWithPreview(
+  private val _textEditorWithPreview = TextEditorWithPreview(
     editor, preview, NAME, TextEditorWithPreview.Layout.SHOW_EDITOR_AND_PREVIEW, !PdfViewerSettings.instance.isVerticalSplit
   )
 
   init {
 //    Disposer.register(this, textEditorWithPreview)
-    Disposer.register(textEditorWithPreview, messageBusConnection)
-    Disposer.register(textEditorWithPreview, editor)
-    Disposer.register(textEditorWithPreview, preview)
+    Disposer.register(_textEditorWithPreview, messageBusConnection)
+    Disposer.register(_textEditorWithPreview, editor)
+    Disposer.register(_textEditorWithPreview, preview)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC_SETTINGS, PdfViewerSettingsListener {
-      textEditorWithPreview.isVerticalSplit = !it.isVerticalSplit
+      _textEditorWithPreview.isVerticalSplit = !it.isVerticalSplit
+    })
+
+    val multicaster = EditorFactory.getInstance().eventMulticaster
+    if (multicaster is EditorEventMulticasterEx) {
+      val ex = (EditorEventMulticasterEx) multicaster
+      ex.addFocusChangeListener(new FocusChangeListener() {
+        ....
+      }
+
+    _textEditorWithPreview.component.addFocusListener(object: FocusListener {
+      override fun focusGained(e: FocusEvent?) {
+        println("_textEditorWithPreview gained focus")
+      }
+
+      override fun focusLost(e: FocusEvent?) {
+        println("_textEditorWithPreview lost focus")
+      }
+
     })
   }
 
@@ -67,10 +89,6 @@ class MustacheFileEditor(
     }
   }
 
-  fun getTextEditorWithPreview(): TextEditorWithPreview {
-    return textEditorWithPreview
-  }
-
   fun interface MustacheFileListenerFirstStep {
     fun mustacheFileContentChangedFirstStep()
   }
@@ -92,6 +110,9 @@ class MustacheFileEditor(
     }
   }
 
+  val textEditorWithPreview: TextEditorWithPreview
+    get() = _textEditorWithPreview
+
   companion object {
     val MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC = Topic(MustacheFileListenerFirstStep::class.java)
     val MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC = Topic(MustacheFileListenerSecondStep::class.java)
@@ -104,6 +125,6 @@ class MustacheFileEditor(
     Disposer.dispose(messageBusConnection)
     Disposer.dispose(editor)
     Disposer.dispose(preview)
-    Disposer.dispose(textEditorWithPreview)
+    Disposer.dispose(_textEditorWithPreview)
   }
 }
