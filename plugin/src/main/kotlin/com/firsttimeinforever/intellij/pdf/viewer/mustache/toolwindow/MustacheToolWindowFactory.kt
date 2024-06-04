@@ -13,8 +13,10 @@ import com.intellij.ui.TreeExpandCollapse
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
+import com.intellij.util.containers.toArray
 import generate.PdfStructureService.Structure
 import org.jetbrains.annotations.NotNull
+import org.jetbrains.annotations.Nullable
 import java.awt.BorderLayout
 import javax.swing.BorderFactory
 import javax.swing.ImageIcon
@@ -22,6 +24,7 @@ import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
+import javax.swing.tree.TreePath
 
 class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
@@ -31,14 +34,14 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
   override fun createToolWindowContent(@NotNull project: Project, @NotNull toolWindow: ToolWindow) {
     val toolWindowContent = MustacheToolWindowContent(project, toolWindow)
-    val content = ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
+    Disposer.register(project, toolWindowContent)
+    val content = ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, null, false)
     toolWindow.contentManager.addContent(content)
   }
 
   private class MustacheToolWindowContent(private val project: Project, toolWindow: ToolWindow) : Disposable {
-
-    private val messageBusConnection = project.messageBus.connect()
     private val _contentPanel = JPanel()
+    private val messageBusConnection = project.messageBus.connect()
     private val mustacheContextService = project.service<MustacheContextService>()
     private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
 
@@ -48,31 +51,27 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       _contentPanel.border = BorderFactory.createEmptyBorder(40, 0, 0, 0)
       messageBusConnection.subscribe(
         PdfFileEditorWrapper.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC,
-        PdfFileEditorWrapper.MustacheToolWindowListener {
+        PdfFileEditorWrapper.MustacheToolWindowListener { root, selectedNodeName ->
           if (_contentPanel.components.isNotEmpty()) _contentPanel.remove(0)
-          _contentPanel.add(createTree(it), BorderLayout.CENTER)
+          if (root != null) _contentPanel.add(createTree(root, selectedNodeName), BorderLayout.CENTER)
+          _contentPanel.updateUI()
         })
     }
 
-    private fun createTree(root: String): JPanel {
-      val panel = JPanel()
-
-//      val editor = FileEditorManager.getInstance(project).selectedEditor
-//      if (editor is TextEditorWithPreview && editor.name == MustacheFileEditor.NAME) {
-//        mustacheIncludeProcessor.getRootsForMustache(editor.file).map {
-      val rootNode = DefaultMutableTreeNode(root)
+    private fun createTree(root: String, selectedNodeName: String?): JBScrollPane {
+      val rootNode = DefaultMutableTreeNode(Structure(root, 0))
       val structures = mustacheIncludeProcessor.getPdfForRoot(root).structures
-      populateNodeFromStructures(rootNode, structures)
-      val tree = Tree(DefaultTreeModel(rootNode))
-      TreeExpandCollapse.expandAll(tree)
+      val selectedTreePaths = mutableListOf<TreePath>()
+      populateNodeFromStructures(rootNode, structures) {
+        if ((it.userObject as Structure).name == selectedNodeName)
+          selectedTreePaths.add(TreePath(it))
+      }
+      val treeModel = DefaultTreeModel(rootNode)
+      val tree = Tree(treeModel)
+      expandToPaths(tree, selectedTreePaths)
       val scrollTree = JBScrollPane()
       scrollTree.setViewportView(tree)
-//          return@map scrollTree
-//        }.forEach { panel.add(it) }
-//      }
-      panel.add(scrollTree)
-
-      return panel
+      return scrollTree
     }
 
     private fun setIconLabel(label: JLabel, imagePath: String) {
@@ -85,15 +84,31 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
     companion object {
       private const val TIME_ICON_PATH = "/icons/toolwindow/Time-icon.png"
 
-      private fun populateNodeFromStructures(node: DefaultMutableTreeNode, structures: MutableList<Structure>) {
+      private fun interface Visitor {
+        fun visit(node: DefaultMutableTreeNode)
+      }
+
+      private fun populateNodeFromStructures(node: DefaultMutableTreeNode, structures: List<Structure>, @Nullable visitor: Visitor?) {
         for (structure in structures) {
           val newNode = DefaultMutableTreeNode(structure)
           val insideStructures = structure.structures
           if (insideStructures != null) {
-            populateNodeFromStructures(newNode, insideStructures)
+            populateNodeFromStructures(newNode, insideStructures, visitor)
           }
           node.add(newNode)
+          visitor?.visit(node)
         }
+      }
+
+      private fun expandToPaths(tree: Tree, treePaths: List<TreePath>) {
+        if(treePaths.isEmpty()) {
+          TreeExpandCollapse.expandAll(tree)
+          return
+        }
+        tree.expandsSelectedPaths = true
+        tree.scrollsOnExpand = true
+        tree.selectionPaths = treePaths.toTypedArray()
+        tree.scrollPathToVisible(treePaths[0])
       }
     }
 

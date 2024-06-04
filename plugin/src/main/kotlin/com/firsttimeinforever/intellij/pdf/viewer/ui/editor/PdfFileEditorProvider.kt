@@ -22,11 +22,12 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   override fun getEditorTypeId() = PDF
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
+    if (file.fileType == PdfFileType) return true
     return try {
       MUSTAHCE_PREFIX = instance.customMustachePrefix
       MUSTACHE_SUFFIX = instance.customMustacheSuffix
       RESOURCES_WITH_MUSTACHE_PREFIX_PATH = getResourcesWithMustachePrefixPath(project, file)
-      file.fileType == PdfFileType || (mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX)
+      mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX
     } catch (e: Exception) {
       // log maybe? or not
       false

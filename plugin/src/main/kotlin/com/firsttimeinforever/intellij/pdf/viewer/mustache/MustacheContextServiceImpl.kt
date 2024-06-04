@@ -2,10 +2,21 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MustacheFileEditor
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorWrapper
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorWrapper.Companion.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.ex.EditorEventMulticasterEx
+import com.intellij.openapi.editor.ex.FocusChangeListener
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.io.toCanonicalPath
@@ -18,8 +29,7 @@ import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
 import com.intellij.openapi.wm.ToolWindowManager
 import generate.MustacheIncludeProcessor
-import generate.Utils.MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX
-import generate.Utils.isFileUnderResourcesPathWithPrefix
+import generate.Utils.*
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -30,13 +40,50 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   private val fileChangedListener = FileChangedListener()
   private val myAppLifecycleListener = MyAppLifecycleListener()
   private val messageBusConnection = project.messageBus.connect()
-  private val mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance()
+  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance()
 
   init {
     Disposer.register(this, messageBusConnection)
     println("MustacheContextServiceImpl initialized for " + project.name)
+
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
-    ApplicationManager.getApplication().messageBus.connect().subscribe(AppLifecycleListener.TOPIC, myAppLifecycleListener)
+    messageBusConnection.subscribe(AppLifecycleListener.TOPIC, myAppLifecycleListener)
+
+    val multicaster = EditorFactory.getInstance().eventMulticaster
+    if (multicaster is EditorEventMulticasterEx) {
+      multicaster.addFocusChangeListener(object : FocusChangeListener {
+        override fun focusGained(editor: Editor) {
+          println("editor")
+          println(editor)
+        }
+      }, project)
+    }
+
+    messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
+      override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+        super.fileOpened(source, file)
+      }
+
+      override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
+        super.fileClosed(source, file)
+      }
+
+      override fun selectionChanged(event: FileEditorManagerEvent) {
+        super.selectionChanged(event)
+        val selectedEditor = event.newEditor
+        var root = null.toString()
+        var selectedNode = null.toString()
+        if (selectedEditor is TextEditorWithPreview
+          && selectedEditor.name == MustacheFileEditor.NAME) {
+          val pdfFileEditorWrapper = selectedEditor.previewEditor as PdfFileEditorWrapper
+          root = pdfFileEditorWrapper.activeTabRoot
+          selectedNode = getRelativePathFromResourcePathWithMustachePrefixPath(selectedEditor.file)
+        }
+        project.messageBus.syncPublisher(MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC)
+          .rootChanged(root, selectedNode)
+      }
+    })
+
     val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
     toolWindow?.setAvailable(true, null)
   }
@@ -54,7 +101,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       if (events.any { isFileUnderResourcesPathWithPrefix(project, it.file) }) {
         // TODO keep in mind operation concurrency?
         // redoing mustache dependency tree
-        mustacheIncludeProcessor.processFileIncludePropsMap()
+        _mustacheIncludeProcessor.processFileIncludePropsMap()
       }
 
       if (events.any {
@@ -76,7 +123,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   }
 
   private inner class MyAppLifecycleListener : AppLifecycleListener {
-
     override fun appClosing() {
       super.appClosing()
       cleanupMtfPdf()
@@ -95,7 +141,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   }
 
   override fun getMustacheIncludeProcessor(): MustacheIncludeProcessor {
-    return mustacheIncludeProcessor
+    return _mustacheIncludeProcessor
   }
 
   override fun dispose() {

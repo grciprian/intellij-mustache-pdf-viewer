@@ -7,12 +7,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.editor.ex.EditorEventMulticasterEx
-import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
-import com.intellij.openapi.fileEditor.FileEditor
-import com.intellij.openapi.fileEditor.TextEditor
-import com.intellij.openapi.fileEditor.TextEditorWithPreview
+import com.intellij.openapi.fileEditor.*
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
@@ -23,8 +18,7 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.messages.Topic
 import org.jetbrains.annotations.NotNull
-import java.awt.event.FocusEvent
-import java.awt.event.FocusListener
+
 
 class MustacheFileEditor(
   val project: @NotNull Project, val virtualFile: @NotNull VirtualFile
@@ -49,24 +43,6 @@ class MustacheFileEditor(
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC_SETTINGS, PdfViewerSettingsListener {
       _textEditorWithPreview.isVerticalSplit = !it.isVerticalSplit
     })
-
-    val multicaster = EditorFactory.getInstance().eventMulticaster
-    if (multicaster is EditorEventMulticasterEx) {
-      val ex = (EditorEventMulticasterEx) multicaster
-      ex.addFocusChangeListener(new FocusChangeListener() {
-        ....
-      }
-
-    _textEditorWithPreview.component.addFocusListener(object: FocusListener {
-      override fun focusGained(e: FocusEvent?) {
-        println("_textEditorWithPreview gained focus")
-      }
-
-      override fun focusLost(e: FocusEvent?) {
-        println("_textEditorWithPreview lost focus")
-      }
-
-    })
   }
 
   private inner class FileChangedListener : BulkFileListener {
@@ -81,9 +57,9 @@ class MustacheFileEditor(
         println("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
         val mustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(editor.file)
         mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(mustacheFileRoots)
-        ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
+        project.messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
           .mustacheFileContentChangedFirstStep()
-        ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
+        project.messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
           .mustacheFileContentChangedSecondStep(mustacheFileRoots)
       }
     }
