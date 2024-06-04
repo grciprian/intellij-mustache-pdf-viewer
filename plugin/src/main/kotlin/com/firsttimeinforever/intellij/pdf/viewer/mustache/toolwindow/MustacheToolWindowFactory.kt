@@ -9,11 +9,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
-import com.intellij.ui.TreeExpandCollapse
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
-import com.intellij.util.containers.toArray
 import generate.PdfStructureService.Structure
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.annotations.Nullable
@@ -34,7 +32,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
   override fun createToolWindowContent(@NotNull project: Project, @NotNull toolWindow: ToolWindow) {
     val toolWindowContent = MustacheToolWindowContent(project, toolWindow)
-    Disposer.register(project, toolWindowContent)
+    Disposer.register(project, toolWindowContent) // something something about project as disposable
     val content = ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, null, false)
     toolWindow.contentManager.addContent(content)
   }
@@ -49,8 +47,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       Disposer.register(this, messageBusConnection)
       _contentPanel.layout = BorderLayout(0, 20)
       _contentPanel.border = BorderFactory.createEmptyBorder(40, 0, 0, 0)
-      messageBusConnection.subscribe(
-        PdfFileEditorWrapper.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC,
+      messageBusConnection.subscribe(PdfFileEditorWrapper.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC,
         PdfFileEditorWrapper.MustacheToolWindowListener { root, selectedNodeName ->
           if (_contentPanel.components.isNotEmpty()) _contentPanel.remove(0)
           if (root != null) _contentPanel.add(createTree(root, selectedNodeName), BorderLayout.CENTER)
@@ -61,14 +58,13 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
     private fun createTree(root: String, selectedNodeName: String?): JBScrollPane {
       val rootNode = DefaultMutableTreeNode(Structure(root, 0))
       val structures = mustacheIncludeProcessor.getPdfForRoot(root).structures
-      val selectedTreePaths = mutableListOf<TreePath>()
+      val selectedNodes = mutableListOf<DefaultMutableTreeNode>()
       populateNodeFromStructures(rootNode, structures) {
-        if ((it.userObject as Structure).name == selectedNodeName)
-          selectedTreePaths.add(TreePath(it))
+        if ((it.userObject as Structure).name == selectedNodeName) selectedNodes.add(it)
       }
       val treeModel = DefaultTreeModel(rootNode)
       val tree = Tree(treeModel)
-      expandToPaths(tree, selectedTreePaths)
+      expandToPaths(tree, selectedNodes)
       val scrollTree = JBScrollPane()
       scrollTree.setViewportView(tree)
       return scrollTree
@@ -100,15 +96,15 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         }
       }
 
-      private fun expandToPaths(tree: Tree, treePaths: List<TreePath>) {
-        if(treePaths.isEmpty()) {
-          TreeExpandCollapse.expandAll(tree)
-          return
-        }
+      private fun expandToPaths(tree: Tree, nodes: List<DefaultMutableTreeNode>) {
         tree.expandsSelectedPaths = true
         tree.scrollsOnExpand = true
-        tree.selectionPaths = treePaths.toTypedArray()
-        tree.scrollPathToVisible(treePaths[0])
+        if (nodes.isEmpty()) {
+          tree.selectionPath = TreePath((tree.model.root as DefaultMutableTreeNode).path)
+          return
+        }
+        tree.selectionPaths = nodes.map { TreePath(it.path) }.toTypedArray()
+        tree.scrollPathToVisible(tree.selectionPaths?.get(0))
       }
     }
 
