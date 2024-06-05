@@ -24,7 +24,7 @@ public class PdfStructureService {
       segsField.setAccessible(true);
       var segs = (Object[]) segsField.get(template);
       structure.addAll(processSegments(segs));
-    } catch (NoSuchFieldException e) {
+    } catch (NoSuchFieldException e) { //IllegalAccessException e
       System.out.println("No field with the name provided could be found: " + e.getMessage());
       e.printStackTrace();
     } catch (Exception e) {

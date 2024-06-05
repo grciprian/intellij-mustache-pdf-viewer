@@ -10,8 +10,11 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTreeTable
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
+import com.intellij.ui.treeStructure.treetable.ListTreeTableModel
+import com.intellij.util.ui.ColumnInfo
 import generate.PdfStructureService.Structure
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.annotations.Nullable
@@ -31,9 +34,16 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
   }
 
   override fun createToolWindowContent(@NotNull project: Project, @NotNull toolWindow: ToolWindow) {
+    val messageBusConnection = project.messageBus.connect()
+    messageBusConnection.subscribe(PdfFileEditorWrapper.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC,
+      PdfFileEditorWrapper.MustacheToolWindowListener { root, selectedNodeName ->
+        println(root)
+        println(selectedNodeName)
+      })
+
     val toolWindowContent = MustacheToolWindowContent(project, toolWindow)
     Disposer.register(project, toolWindowContent) // something something about project as disposable
-    val content = ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, null, false)
+    val content = ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
     toolWindow.contentManager.addContent(content)
   }
 
@@ -51,7 +61,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         PdfFileEditorWrapper.MustacheToolWindowListener { root, selectedNodeName ->
           if (_contentPanel.components.isNotEmpty()) _contentPanel.remove(0)
           if (root != null) _contentPanel.add(createTree(root, selectedNodeName), BorderLayout.CENTER)
-          _contentPanel.updateUI()
+//          _contentPanel.updateUI()
         })
     }
 
@@ -84,26 +94,44 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         fun visit(node: DefaultMutableTreeNode)
       }
 
+//      var name: ColumnInfo<*, *> = object : ColumnInfo<Any?, Any?>("Name") {
+//        override fun valueOf(o: Any?): Any? {
+//          return if (o is DefaultMutableTreeNode && o.userObject is Structure) {
+//            return (o.userObject as Structure).name
+//          } else o
+//        }
+//      }
+//
+//      var line: ColumnInfo<*, *> = object : ColumnInfo<Any?, Any?>("Line") {
+//        override fun valueOf(o: Any?): Any? {
+//          return if (o is DefaultMutableTreeNode && o.userObject is Structure) {
+//            return (o.userObject as Structure).line
+//          } else o
+//        }
+//      }
+//
+//      var columns: Array<ColumnInfo<*, *>> = arrayOf(name, line)
+
       private fun populateNodeFromStructures(node: DefaultMutableTreeNode, structures: List<Structure>, @Nullable visitor: Visitor?) {
         for (structure in structures) {
           val newNode = DefaultMutableTreeNode(structure)
+          visitor?.visit(newNode)
           val insideStructures = structure.structures
           if (insideStructures != null) {
             populateNodeFromStructures(newNode, insideStructures, visitor)
           }
           node.add(newNode)
-          visitor?.visit(node)
         }
       }
 
       private fun expandToPaths(tree: Tree, nodes: List<DefaultMutableTreeNode>) {
+        val nodesCopy = nodes.toMutableList()
         tree.expandsSelectedPaths = true
         tree.scrollsOnExpand = true
-        if (nodes.isEmpty()) {
-          tree.selectionPath = TreePath((tree.model.root as DefaultMutableTreeNode).path)
-          return
+        if (nodesCopy.isEmpty()) {
+          nodesCopy.add(tree.model.root as DefaultMutableTreeNode)
         }
-        tree.selectionPaths = nodes.map { TreePath(it.path) }.toTypedArray()
+        tree.selectionPaths = nodesCopy.map { TreePath(it.path) }.toTypedArray()
         tree.scrollPathToVisible(tree.selectionPaths?.get(0))
       }
     }

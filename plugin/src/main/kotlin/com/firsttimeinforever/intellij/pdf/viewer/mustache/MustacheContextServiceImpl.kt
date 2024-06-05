@@ -9,10 +9,6 @@ import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.editor.ex.EditorEventMulticasterEx
-import com.intellij.openapi.editor.ex.FocusChangeListener
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -41,6 +37,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   private val myAppLifecycleListener = MyAppLifecycleListener()
   private val messageBusConnection = project.messageBus.connect()
   private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance()
+  private var toolWindowInitialized = false
 
   init {
     Disposer.register(this, messageBusConnection)
@@ -48,16 +45,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     messageBusConnection.subscribe(AppLifecycleListener.TOPIC, myAppLifecycleListener)
-
-    val multicaster = EditorFactory.getInstance().eventMulticaster
-    if (multicaster is EditorEventMulticasterEx) {
-      multicaster.addFocusChangeListener(object : FocusChangeListener {
-        override fun focusGained(editor: Editor) {
-          println("editor")
-          println(editor)
-        }
-      }, project)
-    }
 
     messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
       override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
@@ -75,17 +62,30 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         var selectedNode = null.toString()
         if (selectedEditor is TextEditorWithPreview
           && selectedEditor.name == MustacheFileEditor.NAME) {
+          if(!toolWindowInitialized) {
+            toolWindowInitialized = true
+            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
+            toolWindow?.setAvailable(true, null)
+            toolWindow?.show()
+//            toolWindow?.activate(null)
+          }
           val pdfFileEditorWrapper = selectedEditor.previewEditor as PdfFileEditorWrapper
           root = pdfFileEditorWrapper.activeTabRoot
           selectedNode = getRelativePathFromResourcePathWithMustachePrefixPath(selectedEditor.file)
         }
-        project.messageBus.syncPublisher(MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC)
+        if(root == null.toString()) {
+          toolWindowInitialized = false
+          val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
+//          val contentManager = toolWindow!!.contentManager
+//          contentManager.removeAllContents(true)
+          toolWindow?.setAvailable(false, null)
+          toolWindow?.hide()
+//          toolWindow.remove()
+        }
+        ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC)
           .rootChanged(root, selectedNode)
       }
     })
-
-    val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
-    toolWindow?.setAvailable(true, null)
   }
 
   private inner class FileChangedListener : BulkFileListener {

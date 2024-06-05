@@ -1,7 +1,9 @@
 package com.firsttimeinforever.intellij.pdf.viewer.actions
 
 import com.firsttimeinforever.intellij.pdf.viewer.PdfViewerBundle
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MustacheFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditor
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorWrapper
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfJcefPreviewController
 import com.intellij.ide.ui.UISettings
 import com.intellij.notification.Notification
@@ -11,6 +13,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.project.Project
 
 abstract class PdfAction(protected val viewModeAwareness: ViewModeAwareness = ViewModeAwareness.IDE) : AnAction() {
@@ -48,9 +51,16 @@ abstract class PdfAction(protected val viewModeAwareness: ViewModeAwareness = Vi
      * is possible that there is a PDF open somewhere, but it is not in view.
      */
     fun findEditorInView(event: AnActionEvent): PdfFileEditor? {
-      val focusedEditor = event.getData(PlatformDataKeys.FILE_EDITOR) as? PdfFileEditor
+      var focusedEditor = event.getData(PlatformDataKeys.FILE_EDITOR)
 
-      return focusedEditor ?: run {
+      // if we deal with a MustacheFileEditor(TextEditorWithPreview) than we have to get the wrapped PdfFileEditor
+      if(focusedEditor is TextEditorWithPreview
+        && focusedEditor.name == MustacheFileEditor.NAME) {
+        val pdfFileEditorWrapper = focusedEditor.previewEditor as PdfFileEditorWrapper
+        focusedEditor = pdfFileEditorWrapper.activeTab
+      }
+
+      return focusedEditor as? PdfFileEditor ?: run {
         val project = event.project ?: return null
         FileEditorManager.getInstance(project).selectedEditors.firstOrNull {it is PdfFileEditor} as? PdfFileEditor
       }

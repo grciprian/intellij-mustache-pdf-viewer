@@ -111,6 +111,9 @@ class PdfFileEditorWrapper(
     fun rootChanged(root: String?, selectedNodeName: String?)
   }
 
+  val activeTab: PdfFileEditor
+    get() = syncedTabbedEditors[jbTabbedPane.selectedIndex]
+
   val activeTabRoot: String
     get() = syncedTabbedEditors[jbTabbedPane.selectedIndex].rootName
 

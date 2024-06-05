@@ -39,21 +39,21 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
     })
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     // subscribes to changes directly from a mustache file to reload all previews that depend on it
-    messageBusConnection.subscribe(
-      MustacheFileEditor.MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC,
-      MustacheFileEditor.MustacheFileListenerSecondStep {
-        // if source fileRoots intersects this PdfFileEditor target fileRoots
-        // then the mustache file that was modified impacted the pdf and it needs to be reloaded
-        val pdfFileRoot = mustacheIncludeProcessor.getRootForPdfFile(pdfFile)
-        if (!it.contains(pdfFileRoot)) return@MustacheFileListenerSecondStep
-
-        if (viewComponent.controller == null) {
-          logger.warn("FileChangedListener was called for view with controller == null!")
-        } else {
-          logger.debug("Target file ${pdfFile.path} changed. Reloading current view.")
-          viewComponent.controller.reload(tryToPreserveState = true)
-        }
-      })
+//    messageBusConnection.subscribe(
+//      MustacheFileEditor.MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC,
+//      MustacheFileEditor.MustacheFileListenerSecondStep {
+//        // if source fileRoots intersects this PdfFileEditor target fileRoots
+//        // then the mustache file that was modified impacted the pdf and it needs to be reloaded
+//        val pdfFileRoot = mustacheIncludeProcessor.getRootForPdfFile(pdfFile)
+//        if (!it.contains(pdfFileRoot)) return@MustacheFileListenerSecondStep
+//
+//        if (viewComponent.controller == null) {
+//          logger.warn("FileChangedListener was called for view with controller == null!")
+//        } else {
+//          logger.debug("Target file ${pdfFile.path} changed. Reloading current view.")
+//          viewComponent.controller.reload(tryToPreserveState = true)
+//        }
+//      })
   }
 
   override fun getName(): String = NAME
