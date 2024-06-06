@@ -10,7 +10,7 @@ public class PdfContentStructureServiceTest {
   @Test
   public void testGetSimpleStructure() {
     var template = customMustacheCompiler.compile("{{#one}}1{{/one}} {{^two}}2{{three}}{{/two}}{{four}}");
-    var structure = PdfStructureService.getStructure(template);
+    var structure = PdfStructureService.getStructure("", template);
     System.out.println(structure);
   }
 
@@ -33,7 +33,7 @@ public class PdfContentStructureServiceTest {
       {{/two}}
       {{four}}
       """);
-    var structure = PdfStructureService.getStructure(template);
+    var structure = PdfStructureService.getStructure("", template);
     System.out.println(structure);
   }
 

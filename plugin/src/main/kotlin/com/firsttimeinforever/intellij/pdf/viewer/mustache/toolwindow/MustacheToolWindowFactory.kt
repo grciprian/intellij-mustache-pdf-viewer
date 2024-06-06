@@ -1,14 +1,19 @@
 package com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorWrapper
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.RESOURCES_WITH_MUSTACHE_PREFIX_PATH
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.service
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.JBMenuItem
 import com.intellij.openapi.ui.JBPopupMenu
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBScrollPane
@@ -21,6 +26,7 @@ import java.awt.BorderLayout
 import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.nio.file.Path
 import javax.swing.*
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
@@ -35,7 +41,8 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
   override fun createToolWindowContent(@NotNull project: Project, @NotNull toolWindow: ToolWindow) {
     val messageBusConnection = project.messageBus.connect()
-    messageBusConnection.subscribe(PdfFileEditorWrapper.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC,
+    messageBusConnection.subscribe(
+      PdfFileEditorWrapper.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC,
       PdfFileEditorWrapper.MustacheToolWindowListener { root, selectedNodeName ->
         println(root)
         println(selectedNodeName)
@@ -65,7 +72,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
     }
 
     private fun createTree(root: String, selectedNodeName: String?): JBScrollPane {
-      val rootNode = DefaultMutableTreeNode(Structure(root, 0))
+      val rootNode = DefaultMutableTreeNode(Structure(root, root, 0))
       val structures = mustacheIncludeProcessor.getPdfForRoot(root).structures
       val selectedNodes = mutableListOf<DefaultMutableTreeNode>()
       populateNodeFromStructures(rootNode, structures) {
@@ -87,17 +94,18 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
           val x = mouseEvent.x
           val y = mouseEvent.y
 
-          val t = mouseEvent.source as JTree
-          val path = t.getPathForLocation(x, y) ?: return
-          tree.selectionPath = path
-          val node = path.lastPathComponent as DefaultMutableTreeNode
-          val nodeStructure = node.userObject as Structure
-//          val relativePath =
-
           val popup = JBPopupMenu()
-          val item = JBMenuItem(object : AbstractAction("Go to file: pf " + nodeStructure.parentFragment) {
+          val item = JBMenuItem(object : AbstractAction("Go to file") {
             override fun actionPerformed(e: ActionEvent?) {
-
+              val t = mouseEvent.source as JTree
+              val path = t.getPathForLocation(x, y) ?: return
+              tree.selectionPath = path
+              val node = path.lastPathComponent as DefaultMutableTreeNode
+              val nodeStructure = node.userObject as Structure
+              val relativePath = nodeStructure.parentFragment
+              val file = VfsUtil.findFile(Path.of("$RESOURCES_WITH_MUSTACHE_PREFIX_PATH$relativePath.$MUSTACHE_SUFFIX"), true)
+              val editors = FileEditorManager.getInstance(project).openEditor(OpenFileDescriptor(project, file!!, 0, nodeStructure.line), true)
+              // TODO selection model
             }
           })
           popup.add(item)

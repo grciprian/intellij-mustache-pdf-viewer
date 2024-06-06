@@ -17,13 +17,13 @@ public class PdfStructureService {
     // this class should not be initialized
   }
 
-  public static List<Structure> getStructure(Template template) {
+  public static List<Structure> getStructure(String relativePath, Template template) {
     var structure = new ArrayList<Structure>();
     try {
       var segsField = getField(Template.class, SEGS);
       segsField.setAccessible(true);
       var segs = (Object[]) segsField.get(template);
-      structure.addAll(processSegments(segs));
+      structure.addAll(processSegments(relativePath, segs));
     } catch (NoSuchFieldException e) { //IllegalAccessException e
       System.out.println("No field with the name provided could be found: " + e.getMessage());
       e.printStackTrace();
@@ -33,25 +33,23 @@ public class PdfStructureService {
     return structure;
   }
 
-  private static List<Structure> processSegments(Object[] segs) {
+  private static List<Structure> processSegments(String parentFragment, Object[] segs) {
     var partialStructure = new ArrayList<Structure>();
     for (var seg : segs) {
-      var struct = getNameLine(seg, seg.getClass());
+      var struct = getNameLine(parentFragment, seg, seg.getClass());
       try {
         var segsFromObject = seg;
-        var parentFragment = (String) null;
         try {
           var insideTemplateField = getField(seg.getClass(), TEMPLATE);
           insideTemplateField.setAccessible(true);
           segsFromObject = insideTemplateField.get(seg);
         } catch (NoSuchFieldException | IllegalAccessException e) {
           // seg is not a template so access _segs directly and not from _template
-          parentFragment = struct.name;
         }
         var insideSegsField = getField(segsFromObject.getClass(), SEGS);
         insideSegsField.setAccessible(true);
         var insideSegs = (Object[]) insideSegsField.get(segsFromObject);
-        struct = new Structure(struct.name, struct.line, parentFragment, processSegments(insideSegs));
+        struct = new Structure(parentFragment, struct.name, struct.line, processSegments(struct.name, insideSegs));
       } catch (NoSuchFieldException | IllegalAccessException e) {
         // its a terminal segment
       }
@@ -62,16 +60,16 @@ public class PdfStructureService {
     return partialStructure;
   }
 
-  private static Structure getNameLine(Object seg, Class<?> clazz) {
+  private static Structure getNameLine(String parentFragment, Object seg, Class<?> clazz) {
     try {
       var nameField = getField(clazz, NAME);
       var lineField = getField(clazz, LINE);
       nameField.setAccessible(true);
       lineField.setAccessible(true);
-      return new Structure((String) nameField.get(seg), (int) lineField.get(seg));
+      return new Structure(parentFragment, (String) nameField.get(seg), (int) lineField.get(seg));
     } catch (NoSuchFieldException | IllegalAccessException e) {
 //      System.out.println("No field with the name provided could be found or could not be accessed.");
-      return new Structure(null, -1, null, null);
+      return new Structure(null, null, -1, null);
     }
   }
 
@@ -88,9 +86,9 @@ public class PdfStructureService {
     }
   }
 
-  public record Structure(String name, int line, String parentFragment, List<Structure> structures) {
-    public Structure(String name, int line) {
-      this(name, line, null, null);
+  public record Structure(String parentFragment, String name, int line, List<Structure> structures) {
+    public Structure(String parentFragment, String name, int line) {
+      this(parentFragment, name, line, null);
     }
 
     @Override

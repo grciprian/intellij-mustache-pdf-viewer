@@ -20,6 +20,9 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
+import static generate.Utils.getRelativePathFromResourcePathWithMustachePrefixPath;
+
 public class PdfGenerationService {
 
   static final String PDF_GENERATION_ERROR = "A apărut o problemă în momentul generării fișierului.";
@@ -77,8 +80,10 @@ public class PdfGenerationService {
     }
   }
 
-  public PdfContent generatePdf(Object model, String templateContent) {
+  public PdfContent generatePdf(Object model, VirtualFile mustacheFile) {
     try (var outputStream = new ByteArrayOutputStream()) {
+      var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(mustacheFile);
+      var templateContent = loadText(mustacheFile);
       var template = mustacheCompiler.compile(templateContent);
       var html = template.execute(model);
       writePdfContentToStream(outputStream, html);
@@ -86,7 +91,7 @@ public class PdfGenerationService {
       if (pdf.length == 0) {
         throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
       }
-      var structure = PdfStructureService.getStructure(template);
+      var structure = PdfStructureService.getStructure(relativePath, template);
       return new PdfContent(outputStream.toByteArray(), structure);
     } catch (Exception e) {
       try (var os = new ByteArrayOutputStream()) {

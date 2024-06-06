@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.*;
-import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
 import static java.util.Collections.EMPTY_MAP;
 
 public class Utils {
@@ -64,7 +63,7 @@ public class Utils {
       var path = Path.of(RESOURCES_WITH_MUSTACHE_PREFIX_PATH + simpleFilename + "." + MUSTACHE_SUFFIX);
       var mustacheFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(mustacheFile, "mustacheFile for getPdfFile should not be null! Path: " + path);
-      var pdfContent = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, loadText(mustacheFile));
+      var pdfContent = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, mustacheFile);
       var outputPath = Path.of(simpleFilename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX); // mtf MustacheTemporaryFile
       if (!Files.exists(outputPath)) Files.createFile(outputPath);
       Files.write(outputPath, pdfContent.byteArray());
