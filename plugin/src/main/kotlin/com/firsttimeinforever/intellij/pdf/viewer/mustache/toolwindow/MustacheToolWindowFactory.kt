@@ -6,26 +6,26 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.JBMenuItem
+import com.intellij.openapi.ui.JBPopupMenu
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.components.JBTreeTable
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
-import com.intellij.ui.treeStructure.treetable.ListTreeTableModel
-import com.intellij.util.ui.ColumnInfo
 import generate.PdfStructureService.Structure
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.annotations.Nullable
 import java.awt.BorderLayout
-import javax.swing.BorderFactory
-import javax.swing.ImageIcon
-import javax.swing.JLabel
-import javax.swing.JPanel
+import java.awt.event.ActionEvent
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import javax.swing.*
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
+
 
 class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
@@ -61,7 +61,6 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         PdfFileEditorWrapper.MustacheToolWindowListener { root, selectedNodeName ->
           if (_contentPanel.components.isNotEmpty()) _contentPanel.remove(0)
           if (root != null) _contentPanel.add(createTree(root, selectedNodeName), BorderLayout.CENTER)
-//          _contentPanel.updateUI()
         })
     }
 
@@ -74,13 +73,44 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       }
       val treeModel = DefaultTreeModel(rootNode)
       val tree = Tree(treeModel)
+      tree.addMouseListener(object : MouseAdapter() {
+        override fun mousePressed(e: MouseEvent) {
+          handleContextMenu(e)
+        }
+
+        override fun mouseReleased(e: MouseEvent) {
+          handleContextMenu(e)
+        }
+
+        private fun handleContextMenu(mouseEvent: MouseEvent) {
+          if (!mouseEvent.isPopupTrigger) return
+          val x = mouseEvent.x
+          val y = mouseEvent.y
+
+          val t = mouseEvent.source as JTree
+          val path = t.getPathForLocation(x, y) ?: return
+          tree.selectionPath = path
+          val node = path.lastPathComponent as DefaultMutableTreeNode
+          val nodeStructure = node.userObject as Structure
+//          val relativePath =
+
+          val popup = JBPopupMenu()
+          val item = JBMenuItem(object : AbstractAction("Go to file: pf " + nodeStructure.parentFragment) {
+            override fun actionPerformed(e: ActionEvent?) {
+
+            }
+          })
+          popup.add(item)
+          popup.show(tree, x, y)
+        }
+      })
       expandToPaths(tree, selectedNodes)
       val scrollTree = JBScrollPane()
       scrollTree.setViewportView(tree)
       return scrollTree
     }
 
-    private fun setIconLabel(label: JLabel, imagePath: String) {
+    fun setIconLabel(label: JLabel, imagePath: String) {
       label.icon = ImageIcon(javaClass.getResource(imagePath))
     }
 
