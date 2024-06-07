@@ -33,11 +33,10 @@ class PdfFileEditorWrapper(
   init {
     Disposer.register(this, messageBusConnection)
     mustacheIncludeProcessor.getRootsForMustache(mustacheFile).forEach { addPdfFileEditorTab(it) }
-
     messageBusConnection.subscribe(
       MustacheFileEditor.MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC,
       MustacheFileEditor.MustacheFileListenerFirstStep {
-        updateTabbedPane()
+        updatePdfFileEditorTabs()
       })
     messageBusConnection.subscribe(
       PdfViewerSettings.TOPIC_MUSTACHE,
@@ -60,7 +59,7 @@ class PdfFileEditorWrapper(
     }
   }
 
-  private fun updateTabbedPane() {
+  private fun updatePdfFileEditorTabs() {
     val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile)
     val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableList()
 

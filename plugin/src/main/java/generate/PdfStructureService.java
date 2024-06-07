@@ -37,19 +37,21 @@ public class PdfStructureService {
     var partialStructure = new ArrayList<Structure>();
     for (var seg : segs) {
       var struct = getNameLine(parentFragment, seg, seg.getClass());
+      var newParentFragment = parentFragment;
       try {
         var segsFromObject = seg;
         try {
           var insideTemplateField = getField(seg.getClass(), TEMPLATE);
           insideTemplateField.setAccessible(true);
           segsFromObject = insideTemplateField.get(seg);
+          newParentFragment = struct.name;
         } catch (NoSuchFieldException | IllegalAccessException e) {
           // seg is not a template so access _segs directly and not from _template
         }
         var insideSegsField = getField(segsFromObject.getClass(), SEGS);
         insideSegsField.setAccessible(true);
         var insideSegs = (Object[]) insideSegsField.get(segsFromObject);
-        struct = new Structure(parentFragment, struct.name, struct.line, processSegments(struct.name, insideSegs));
+        struct = new Structure(parentFragment, struct.name, struct.line, processSegments(newParentFragment, insideSegs));
       } catch (NoSuchFieldException | IllegalAccessException e) {
         // its a terminal segment
       }

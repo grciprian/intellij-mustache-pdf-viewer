@@ -10,8 +10,6 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.JBMenuItem
-import com.intellij.openapi.ui.JBPopupMenu
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.wm.ToolWindow
@@ -23,7 +21,6 @@ import generate.PdfStructureService.Structure
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.annotations.Nullable
 import java.awt.BorderLayout
-import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.nio.file.Path
@@ -40,14 +37,6 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
   }
 
   override fun createToolWindowContent(@NotNull project: Project, @NotNull toolWindow: ToolWindow) {
-    val messageBusConnection = project.messageBus.connect()
-    messageBusConnection.subscribe(
-      PdfFileEditorWrapper.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC,
-      PdfFileEditorWrapper.MustacheToolWindowListener { root, selectedNodeName ->
-        println(root)
-        println(selectedNodeName)
-      })
-
     val toolWindowContent = MustacheToolWindowContent(project, toolWindow)
     Disposer.register(project, toolWindowContent) // something something about project as disposable
     val content = ContentFactory.getInstance().createContent(toolWindowContent.contentPanel, "", false)
@@ -91,25 +80,37 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
         private fun handleContextMenu(mouseEvent: MouseEvent) {
           if (!mouseEvent.isPopupTrigger) return
+          println("Go to file")
           val x = mouseEvent.x
           val y = mouseEvent.y
 
-          val popup = JBPopupMenu()
-          val item = JBMenuItem(object : AbstractAction("Go to file") {
-            override fun actionPerformed(e: ActionEvent?) {
-              val t = mouseEvent.source as JTree
-              val path = t.getPathForLocation(x, y) ?: return
-              tree.selectionPath = path
-              val node = path.lastPathComponent as DefaultMutableTreeNode
-              val nodeStructure = node.userObject as Structure
-              val relativePath = nodeStructure.parentFragment
-              val file = VfsUtil.findFile(Path.of("$RESOURCES_WITH_MUSTACHE_PREFIX_PATH$relativePath.$MUSTACHE_SUFFIX"), true)
-              val editors = FileEditorManager.getInstance(project).openEditor(OpenFileDescriptor(project, file!!, 0, nodeStructure.line), true)
-              // TODO selection model
-            }
-          })
-          popup.add(item)
-          popup.show(tree, x, y)
+          val t = mouseEvent.source as JTree
+          val path = t.getPathForLocation(x, y) ?: return
+          tree.selectionPath = path
+          val node = path.lastPathComponent as DefaultMutableTreeNode
+          val nodeStructure = node.userObject as Structure
+          val relativePath = nodeStructure.parentFragment
+          val file = VfsUtil.findFile(Path.of("$RESOURCES_WITH_MUSTACHE_PREFIX_PATH$relativePath.$MUSTACHE_SUFFIX"), true)
+            ?: return
+          val line = if (nodeStructure.line > 0) nodeStructure.line - 1 else 0
+          val editor =
+            FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, file, line, 0), true)
+              ?: return
+          val document = editor.document
+          val startOffset = document.getLineStartOffset(line)
+          val endOffset = document.getLineEndOffset(line)
+          val selectionModel = editor.selectionModel
+          selectionModel.removeSelection()
+          selectionModel.setSelection(startOffset, endOffset)
+
+//          val popup = JBPopupMenu()
+//          val item = JBMenuItem(object : AbstractAction("Go to file") {
+//            override fun actionPerformed(e: ActionEvent?) {
+//              // TODO implement smth
+//            }
+//          })
+//          popup.add(item)
+//          popup.show(tree, x, y)
         }
       })
       expandToPaths(tree, selectedNodes)
