@@ -48,7 +48,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
 
       override fun selectionChanged(event: FileEditorManagerEvent) {
-        super.selectionChanged(event)
         val selectedEditor = event.newEditor
         var root: String? = null
         var selectedNode: String? = null

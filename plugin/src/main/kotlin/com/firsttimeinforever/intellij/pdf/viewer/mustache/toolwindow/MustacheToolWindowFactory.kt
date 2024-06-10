@@ -83,7 +83,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       val pdf = mustacheIncludeProcessor.getPdfForRoot(root) ?: return null
       val structures = pdf.structures
       val selectedNodes = mutableListOf<MustacheTreeNode>()
-      val rootNode = MustacheTreeNode(Structure(root, root, 0))
+      val rootNode = MustacheTreeNode(Structure.createRootStructure(root, selectedNodeName))
       populateNodeFromStructures(rootNode, structures) {
         if (_clickedNodeStructure != null) {
           if (Objects.equals(it.userObject as Structure, _clickedNodeStructure)) selectedNodes.add(it)

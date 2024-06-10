@@ -106,11 +106,11 @@ class PdfFileEditorWrapper(
   override fun getPreferredFocusedComponent(): JComponent = jbTabbedPane.selectedComponent as PdfEditorViewComponent
 
 
-  val activeTab: PdfFileEditor
-    get() = syncedTabbedEditors[jbTabbedPane.selectedIndex]
+  val activeTab: PdfFileEditor?
+    get() = if (jbTabbedPane.selectedIndex >= 0 && jbTabbedPane.selectedIndex < syncedTabbedEditors.size) syncedTabbedEditors[jbTabbedPane.selectedIndex] else null
 
-  val activeTabRoot: String
-    get() = syncedTabbedEditors[jbTabbedPane.selectedIndex].rootName!!
+  val activeTabRoot: String?
+    get() = if (jbTabbedPane.selectedIndex >= 0 && jbTabbedPane.selectedIndex < syncedTabbedEditors.size) syncedTabbedEditors[jbTabbedPane.selectedIndex].rootName!! else null
 
   companion object {
     private const val NAME = "Pdf Wrapper Viewer File Editor"
