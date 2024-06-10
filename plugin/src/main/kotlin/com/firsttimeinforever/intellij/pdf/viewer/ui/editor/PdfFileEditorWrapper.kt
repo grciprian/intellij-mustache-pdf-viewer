@@ -1,6 +1,7 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFontsPathSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MustacheFileEditor.Companion.MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC
@@ -13,7 +14,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
-import com.intellij.util.messages.Topic
 import generate.Utils.getRelativePathFromResourcePathWithMustachePrefixPath
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableSet
@@ -41,7 +41,7 @@ class PdfFileEditorWrapper(
     messageBusConnection.subscribe(
       PdfViewerSettings.TOPIC_MUSTACHE,
       PdfViewerMustacheFontsPathSettingsListener {
-        val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableSet()
+        val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName!! }.toImmutableSet()
         mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(syncedTabbedRootNames)
         syncedTabbedRootNames.forEach { mustacheIncludeProcessor.processRootPdfFile(it) }
         project.messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
@@ -51,11 +51,10 @@ class PdfFileEditorWrapper(
     jbTabbedPane.model.addChangeListener {
       val source = it.source
       if (source !is DefaultSingleSelectionModel) return@addChangeListener
-      project.messageBus.syncPublisher(MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC)
-        .rootChanged(
-          syncedTabbedEditors[source.selectedIndex].rootName,
-          getRelativePathFromResourcePathWithMustachePrefixPath(mustacheFile)
-        )
+      val root = syncedTabbedEditors[source.selectedIndex].rootName
+      val selectedNodeName = getRelativePathFromResourcePathWithMustachePrefixPath(mustacheFile)
+      project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
+        .rootUpdated(root, selectedNodeName)
     }
   }
 
@@ -84,7 +83,7 @@ class PdfFileEditorWrapper(
     }
 
     // add new identified root files
-    newRoots.forEach { rootName -> addPdfFileEditorTab(rootName) }
+    newRoots.forEach { rootName -> addPdfFileEditorTab(rootName!!) }
 
     // refresh living roots tabs
     project.messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
@@ -106,18 +105,14 @@ class PdfFileEditorWrapper(
 
   override fun getPreferredFocusedComponent(): JComponent = jbTabbedPane.selectedComponent as PdfEditorViewComponent
 
-  fun interface MustacheToolWindowListener {
-    fun rootChanged(root: String?, selectedNodeName: String?)
-  }
 
   val activeTab: PdfFileEditor
     get() = syncedTabbedEditors[jbTabbedPane.selectedIndex]
 
   val activeTabRoot: String
-    get() = syncedTabbedEditors[jbTabbedPane.selectedIndex].rootName
+    get() = syncedTabbedEditors[jbTabbedPane.selectedIndex].rootName!!
 
   companion object {
-    val MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC = Topic(MustacheToolWindowListener::class.java)
     private const val NAME = "Pdf Wrapper Viewer File Editor"
     private val logger = logger<PdfFileEditorWrapper>()
     private const val ADD_INDEX_FOR_NEW_TAB = 0

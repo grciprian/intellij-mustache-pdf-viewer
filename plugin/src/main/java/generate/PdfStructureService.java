@@ -5,6 +5,7 @@ import com.samskivert.mustache.Template;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class PdfStructureService {
 
@@ -51,7 +52,7 @@ public class PdfStructureService {
         var insideSegsField = getField(segsFromObject.getClass(), SEGS);
         insideSegsField.setAccessible(true);
         var insideSegs = (Object[]) insideSegsField.get(segsFromObject);
-        struct = new Structure(parentFragment, struct.name, struct.line, processSegments(newParentFragment, insideSegs));
+        struct = new Structure(parentFragment, struct.name, struct.line, processSegments(newParentFragment, insideSegs), Objects.equals(newParentFragment, struct.name));
       } catch (NoSuchFieldException | IllegalAccessException e) {
         // its a terminal segment
       }
@@ -71,7 +72,7 @@ public class PdfStructureService {
       return new Structure(parentFragment, (String) nameField.get(seg), (int) lineField.get(seg));
     } catch (NoSuchFieldException | IllegalAccessException e) {
 //      System.out.println("No field with the name provided could be found or could not be accessed.");
-      return new Structure(null, null, -1, null);
+      return new Structure(null, null, -1, null, false);
     }
   }
 
@@ -88,14 +89,28 @@ public class PdfStructureService {
     }
   }
 
-  public record Structure(String parentFragment, String name, int line, List<Structure> structures) {
+  public record Structure(String parentFragment, String name, int line, List<Structure> structures, Boolean isFragment) {
+
     public Structure(String parentFragment, String name, int line) {
-      this(parentFragment, name, line, null);
+      this(parentFragment, name, line, null, false);
     }
 
     @Override
     public String toString() {
       return "%s, line=%d".formatted(name, line);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      Structure structure = (Structure) o;
+      return line == structure.line && Objects.equals(name, structure.name) && Objects.equals(isFragment, structure.isFragment) && Objects.equals(parentFragment, structure.parentFragment) && Objects.equals(structures, structure.structures);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(parentFragment, name, line, structures);
     }
   }
 

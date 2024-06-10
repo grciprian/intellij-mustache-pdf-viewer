@@ -1,15 +1,14 @@
 package com.firsttimeinforever.intellij.pdf.viewer.mustache
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MustacheFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorWrapper
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorWrapper.Companion.MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
@@ -47,22 +46,16 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     messageBusConnection.subscribe(AppLifecycleListener.TOPIC, myAppLifecycleListener)
 
     messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
-      override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
-        super.fileOpened(source, file)
-      }
-
-      override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-        super.fileClosed(source, file)
-      }
 
       override fun selectionChanged(event: FileEditorManagerEvent) {
         super.selectionChanged(event)
         val selectedEditor = event.newEditor
-        var root = null.toString()
-        var selectedNode = null.toString()
+        var root: String? = null
+        var selectedNode: String? = null
         if (selectedEditor is TextEditorWithPreview
-          && selectedEditor.name == MustacheFileEditor.NAME) {
-          if(!toolWindowInitialized) {
+          && selectedEditor.name == MustacheFileEditor.NAME
+        ) {
+          if (!toolWindowInitialized) {
             toolWindowInitialized = true
             val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
             toolWindow?.setAvailable(true, null)
@@ -73,7 +66,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           root = pdfFileEditorWrapper.activeTabRoot
           selectedNode = getRelativePathFromResourcePathWithMustachePrefixPath(selectedEditor.file)
         }
-        if(root == null.toString()) {
+        if (root == null) {
           toolWindowInitialized = false
           val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
 //          val contentManager = toolWindow!!.contentManager
@@ -82,8 +75,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           toolWindow?.hide()
 //          toolWindow.remove()
         }
-        ApplicationManager.getApplication().messageBus.syncPublisher(MUSTACHE_TOOL_WINDOW_LISTENER_TOPIC)
-          .rootChanged(root, selectedNode)
+        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
+          .rootUpdated(root, selectedNode)
       }
     })
   }

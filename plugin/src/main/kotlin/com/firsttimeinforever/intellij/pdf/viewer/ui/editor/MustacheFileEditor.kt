@@ -1,6 +1,7 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettingsListener
 import com.intellij.openapi.Disposable
@@ -17,7 +18,6 @@ import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.messages.Topic
 import org.jetbrains.annotations.NotNull
-
 
 class MustacheFileEditor(
   val project: @NotNull Project, val virtualFile: @NotNull VirtualFile
@@ -48,18 +48,21 @@ class MustacheFileEditor(
     override fun after(events: MutableList<out VFileEvent>) {
       // if the file modified is the current opened editor file then reprocess the pdf file
       // and announce the correspondent PdfFileEditor to reload
+      val editorFile = editor.file
       if (events.any {
-          it.file == editor.file && it.file?.canonicalPath?.indexOf(RESOURCES_WITH_MUSTACHE_PREFIX_PATH, 0, false) == 0
+          it.file == editorFile && it.file?.canonicalPath?.indexOf(RESOURCES_WITH_MUSTACHE_PREFIX_PATH, 0, false) == 0
         }) {
         println("processFileIncludePropsMap after any files modification under resources folder")
         mustacheIncludeProcessor.processFileIncludePropsMap()
-        println("Target file ${editor.file.canonicalPath} changed. Reloading current view.")
-        val mustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(editor.file)
+        println("Target file ${editorFile.canonicalPath} changed. Reloading current view.")
+        val mustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(editorFile)
         mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(mustacheFileRoots)
         project.messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
           .mustacheFileContentChangedFirstStep()
         project.messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
           .mustacheFileContentChangedSecondStep(mustacheFileRoots)
+        project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
+          .refresh()
       }
     }
   }
@@ -69,7 +72,7 @@ class MustacheFileEditor(
   }
 
   fun interface MustacheFileListenerSecondStep {
-    fun mustacheFileContentChangedSecondStep(updatedMustacheFileRoots: Set<String>)
+    fun mustacheFileContentChangedSecondStep(updatedMustacheFileRoots: Set<String?>)
   }
 
   private fun createEditorBuilder(): AsyncFileEditorProvider.Builder {

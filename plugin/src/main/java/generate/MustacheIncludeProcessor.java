@@ -1,5 +1,6 @@
 package generate;
 
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import generate.PdfGenerationService.Pdf;
@@ -16,6 +17,7 @@ import static generate.Utils.getRelativePathFromResourcePathWithMustachePrefixPa
 
 public class MustacheIncludeProcessor {
 
+  private static final Logger logger = Logger.getInstance(MustacheIncludeProcessor.class);
   private static MustacheIncludeProcessor instance;
   private final Map<String, PdfFileExpirationWrapper> rootPdfFileMap = new HashMap<>();
   private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
@@ -86,7 +88,6 @@ public class MustacheIncludeProcessor {
         newRootPdfFileMap.put(name, null);
       }
     });
-    System.out.println(includePropsMap);
     //clean expired roots
     rootPdfFileMap.keySet().stream()
       .filter(rootName -> !newRootPdfFileMap.containsKey(rootName))
@@ -117,7 +118,7 @@ public class MustacheIncludeProcessor {
   }
 
   // maybe rethink this flow
-  public String getRootForPdfFile(VirtualFile pdfFile) {
+  public String getRootForPdfFile(VirtualFile pdfFile) throws RuntimeException {
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
       .filter(entry -> Objects.equals(entry.getValue().pdf.file().getCanonicalPath(), pdfFile.getCanonicalPath()))
@@ -127,7 +128,10 @@ public class MustacheIncludeProcessor {
   }
 
   public Pdf getPdfForRoot(String root) {
-    if(!rootPdfFileMap.containsKey(root)) throw new RuntimeException("The root provided may not actually be a root!");
+    if (!rootPdfFileMap.containsKey(root)) {
+      logger.warn("The root provided may not actually be a root!");
+      return null;
+    }
     return rootPdfFileMap.get(root).pdf;
   }
 
