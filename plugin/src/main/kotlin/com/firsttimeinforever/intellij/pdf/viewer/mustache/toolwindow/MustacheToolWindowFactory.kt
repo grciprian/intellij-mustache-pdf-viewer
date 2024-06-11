@@ -46,7 +46,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
   private class MustacheToolWindowContent(private val project: Project, toolWindow: ToolWindow) : Disposable {
     private val _contentPanel = JPanel()
-    private var _root: String? = null
+    private lateinit var _root: String
     private var _selectedNodeName: String? = null
     private var _clickedNodeStructure: Structure? = null // higher priority than _selectedNodeName
     private val messageBusConnection = project.messageBus.connect()
@@ -60,7 +60,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       messageBusConnection.subscribe(
         MustacheToolWindowListener.TOPIC,
         object : MustacheToolWindowListener {
-          override fun rootUpdated(root: String?, selectedNodeName: String?) {
+          override fun rootChanged(root: String, selectedNodeName: String?) {
             _root = root
             _selectedNodeName = selectedNodeName
             handleTreeInContentPanel(root, selectedNodeName)
@@ -70,11 +70,9 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
             handleTreeInContentPanel(_root, _selectedNodeName)
           }
 
-          private fun handleTreeInContentPanel(root: String?, selectedNodeName: String?) {
+          private fun handleTreeInContentPanel(root: String, selectedNodeName: String?) {
             if (_contentPanel.components.isNotEmpty()) _contentPanel.remove(0)
-            if (root == null) return
-            val scrollableTree = createTree(root, selectedNodeName)
-            if (scrollableTree != null) _contentPanel.add(scrollableTree)
+            _contentPanel.add(createTree(root, selectedNodeName))
           }
         })
     }

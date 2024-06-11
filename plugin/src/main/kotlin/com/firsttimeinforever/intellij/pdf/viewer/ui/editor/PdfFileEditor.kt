@@ -4,6 +4,7 @@ import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServic
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.structureView.PdfStructureViewBuilder
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheRefreshPdfFileEditorTabs
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
 import com.intellij.ide.structureView.StructureViewBuilder
@@ -25,10 +26,12 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
   private val mustacheContextService = project.service<MustacheContextService>()
   private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
-  var rootName: String? = null
+  private var _rootName: String = null.toString()
+  val rootName: String
+    get() = _rootName
 
   constructor(project: Project, pdfFile: VirtualFile, rootName: String) : this(project, pdfFile) {
-    this.rootName = rootName
+    this._rootName = rootName
   }
 
   init {
@@ -40,12 +43,12 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     // subscribes to changes directly from a mustache file to reload all previews that depend on it
     messageBusConnection.subscribe(
-      MustacheFileEditor.MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC,
-      MustacheFileEditor.MustacheFileListenerSecondStep {
+      MustacheRefreshPdfFileEditorTabs.TOPIC,
+      MustacheRefreshPdfFileEditorTabs {
         // if source fileRoots intersects this PdfFileEditor target fileRoots
         // then the mustache file that was modified impacted the pdf and it needs to be reloaded
-        val pdfFileRoot = mustacheIncludeProcessor.getRootForPdfFile(pdfFile)
-        if (!it.contains(pdfFileRoot)) return@MustacheFileListenerSecondStep
+        val pdfMustacheRoot = mustacheIncludeProcessor.getMustacheRootForPdfFile(pdfFile) ?: return@MustacheRefreshPdfFileEditorTabs
+        if (!it.contains(pdfMustacheRoot)) return@MustacheRefreshPdfFileEditorTabs
 
         if (viewComponent.controller == null) {
           logger.warn("FileChangedListener was called for view with controller == null!")

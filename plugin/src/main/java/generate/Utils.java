@@ -44,17 +44,14 @@ public class Utils {
     }
   }
 
-  public static String getRelativePathFromResourcePathWithMustachePrefixPath(VirtualFile virtualFile) {
+  public static String getRelativePathFromResourcePathWithMustachePrefixPath(Project project, VirtualFile virtualFile) {
+    if (!isFileUnderResourcesPathWithPrefix(project, virtualFile)) return null;
     var canonicalPath = virtualFile.getCanonicalPath();
     Objects.requireNonNull(canonicalPath, "Could not getRelativePathFromResourcePathWithPrefix because canonicalPath of virtualFile is null!");
     var extensionPointIndex = StringUtilRt.lastIndexOf(canonicalPath, '.', 0, canonicalPath.length());
-    if (extensionPointIndex < 0) {
-      return null;
-    }
+    if (extensionPointIndex < 0) return null;
     var extension = canonicalPath.subSequence(extensionPointIndex + 1, canonicalPath.length());
-    if (!MUSTACHE_SUFFIX.contentEquals(extension)) {
-      return null;
-    }
+    if (!MUSTACHE_SUFFIX.contentEquals(extension)) return null;
     return canonicalPath.substring(RESOURCES_WITH_MUSTACHE_PREFIX_PATH.length(), extensionPointIndex);
   }
 

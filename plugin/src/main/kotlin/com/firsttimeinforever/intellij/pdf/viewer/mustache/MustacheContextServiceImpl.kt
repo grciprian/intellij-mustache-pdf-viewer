@@ -3,8 +3,8 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MustacheFileEditor
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorWrapper
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustachePdfFileEditorWrapper
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -33,67 +33,59 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
   private val settings = PdfViewerSettings.instance
   private val fileChangedListener = FileChangedListener()
-  private val myAppLifecycleListener = MyAppLifecycleListener()
+  private val appLifecycleListener = MyAppLifecycleListener()
+  private val fileEditorManagerListener = MyFileEditorManagerListener()
   private val messageBusConnection = project.messageBus.connect()
-  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance()
+  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(project);
   private var toolWindowInitialized = false
 
   init {
     Disposer.register(this, messageBusConnection)
     println("MustacheContextServiceImpl initialized for " + project.name)
 
+    messageBusConnection.subscribe(AppLifecycleListener.TOPIC, appLifecycleListener)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
-    messageBusConnection.subscribe(AppLifecycleListener.TOPIC, myAppLifecycleListener)
+    messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileEditorManagerListener)
+  }
 
-    messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
+  private inner class MyAppLifecycleListener : AppLifecycleListener {
+    override fun appClosing() {
+      cleanupMtfPdf()
+    }
 
-      override fun selectionChanged(event: FileEditorManagerEvent) {
-        val selectedEditor = event.newEditor
-        var root: String? = null
-        var selectedNode: String? = null
-        if (selectedEditor is TextEditorWithPreview
-          && selectedEditor.name == MustacheFileEditor.NAME
-        ) {
-          if (!toolWindowInitialized) {
-            toolWindowInitialized = true
-            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
-            toolWindow?.setAvailable(true, null)
-            toolWindow?.show()
-//            toolWindow?.activate(null)
-          }
-          val pdfFileEditorWrapper = selectedEditor.previewEditor as PdfFileEditorWrapper
-          root = pdfFileEditorWrapper.activeTabRoot
-          selectedNode = getRelativePathFromResourcePathWithMustachePrefixPath(selectedEditor.file)
-        }
-        if (root == null) {
-          toolWindowInitialized = false
-          val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
-//          val contentManager = toolWindow!!.contentManager
-//          contentManager.removeAllContents(true)
-          toolWindow?.setAvailable(false, null)
-          toolWindow?.hide()
-//          toolWindow.remove()
-        }
-        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-          .rootUpdated(root, selectedNode)
+    private fun cleanupMtfPdf() {
+      val root = VfsUtil.findFile(Path.of("./"), true) as VirtualFile
+      VfsUtil.processFileRecursivelyWithoutIgnored(root) {
+        if (it.isDirectory) return@processFileRecursivelyWithoutIgnored true
+        if (it.name.contains(MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)) Files.deleteIfExists(it.toNioPath())
+        return@processFileRecursivelyWithoutIgnored true
       }
-    })
+    }
   }
 
   private inner class FileChangedListener : BulkFileListener {
     override fun after(events: MutableList<out VFileEvent>) {
+      watchFonts(events)
+      watchTemplates(events)
+    }
+
+    private fun watchTemplates(events: MutableList<out VFileEvent>) {
+      if (events.any { isFileUnderResourcesPathWithPrefix(project, it.file) }) {
+        // TODO keep in mind operation concurrency?
+        // redoing mustache dependency tree
+//        val mustacheFileRoots = _mustacheIncludeProcessor.getRootsForMustache(editorFile)
+//        _mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(mustacheFileRoots)
+//        _mustacheIncludeProcessor.processFileIncludePropsMap()
+      }
+    }
+
+    private fun watchFonts(events: MutableList<out VFileEvent>) {
       val fontsPath = Path.of(settings.customMustacheFontsPath).toCanonicalPath()
 
       fun checkFilePathWithFontsPathBasedOnFileType(filePath: String, isDirectory: Boolean): Boolean {
         val canonicalFilePath = Path.of(filePath).toCanonicalPath()
         if (isDirectory) return canonicalFilePath == fontsPath
         return canonicalFilePath.startsWith("$fontsPath/")
-      }
-
-      if (events.any { isFileUnderResourcesPathWithPrefix(project, it.file) }) {
-        // TODO keep in mind operation concurrency?
-        // redoing mustache dependency tree
-        _mustacheIncludeProcessor.processFileIncludePropsMap()
       }
 
       if (events.any {
@@ -114,20 +106,31 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     }
   }
 
-  private inner class MyAppLifecycleListener : AppLifecycleListener {
-    override fun appClosing() {
-      super.appClosing()
-      cleanupMtfPdf()
-    }
-
-    private fun cleanupMtfPdf() {
-      val root = VfsUtil.findFile(Path.of("./"), true) as VirtualFile
-      VfsUtil.processFileRecursivelyWithoutIgnored(root) {
-        if (it.isDirectory) return@processFileRecursivelyWithoutIgnored true
-        if (it.name.contains(MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)) {
-          Files.deleteIfExists(it.toNioPath())
+  private inner class MyFileEditorManagerListener : FileEditorManagerListener {
+    override fun selectionChanged(event: FileEditorManagerEvent) {
+      val selectedEditor = event.newEditor
+      var root: String? = null
+      if (selectedEditor is TextEditorWithPreview
+        && selectedEditor.name == MustacheFileEditor.NAME
+      ) {
+        if (!toolWindowInitialized) {
+          toolWindowInitialized = true
+          val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
+          toolWindow?.setAvailable(true, null)
+          toolWindow?.show()
         }
-        return@processFileRecursivelyWithoutIgnored true
+        root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot
+        if (root != null) {
+          val selectedNodeName = getRelativePathFromResourcePathWithMustachePrefixPath(project, selectedEditor.file)
+          ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
+            .rootChanged(root, selectedNodeName)
+        }
+      }
+      if (root == null && toolWindowInitialized) {
+        toolWindowInitialized = false
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(MustacheToolWindowFactory.NAME)
+        toolWindow?.setAvailable(false, null)
+        toolWindow?.hide()
       }
     }
   }

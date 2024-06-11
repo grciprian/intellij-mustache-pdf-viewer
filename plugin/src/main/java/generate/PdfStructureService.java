@@ -1,6 +1,7 @@
 package generate;
 
 import com.samskivert.mustache.Template;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.util.*;
@@ -121,8 +122,10 @@ public class PdfStructureService {
       return new Structure(null, null, -1, null, null);
     }
 
-    public static Structure createRootStructure(String root, String selectedNodeName) {
-      var name = selectedNodeName + " @ " + root;
+    public static Structure createRootStructure(String root, @Nullable String selectedNodeName) {
+      var name = Optional.ofNullable(selectedNodeName)
+        .map(v -> v + " @ " + root)
+        .orElse(root);
       return new Structure(name, name, -1, null, null);
     }
 

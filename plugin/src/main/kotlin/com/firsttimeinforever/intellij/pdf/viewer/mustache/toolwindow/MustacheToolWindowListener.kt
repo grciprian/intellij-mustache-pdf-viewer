@@ -4,7 +4,7 @@ import com.intellij.util.messages.Topic
 
 interface MustacheToolWindowListener {
 
-  fun rootUpdated(root: String?, selectedNodeName: String?)
+  fun rootChanged(root: String, selectedNodeName: String?)
 
   fun refresh()
 

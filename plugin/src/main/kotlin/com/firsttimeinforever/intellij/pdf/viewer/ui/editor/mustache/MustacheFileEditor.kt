@@ -1,4 +1,4 @@
-package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
+package com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
@@ -7,7 +7,10 @@ import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettingsList
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.fileEditor.*
+import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
+import com.intellij.openapi.fileEditor.FileEditor
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
@@ -16,7 +19,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
-import com.intellij.util.messages.Topic
+import generate.Utils.isFileUnderResourcesPathWithPrefix
 import org.jetbrains.annotations.NotNull
 
 class MustacheFileEditor(
@@ -28,7 +31,7 @@ class MustacheFileEditor(
   private val messageBusConnection = project.messageBus.connect()
   private val fileChangedListener = FileChangedListener()
   private val editor = createEditorBuilder().build() as TextEditor
-  private val preview = PdfFileEditorWrapper(project, virtualFile)
+  private val preview = MustachePdfFileEditorWrapper(project, virtualFile)
   private val _textEditorWithPreview = TextEditorWithPreview(
     editor, preview, NAME, TextEditorWithPreview.Layout.SHOW_EDITOR_AND_PREVIEW, !PdfViewerSettings.instance.isVerticalSplit
   )
@@ -50,29 +53,18 @@ class MustacheFileEditor(
       // and announce the correspondent PdfFileEditor to reload
       val editorFile = editor.file
       if (events.any {
-          it.file == editorFile && it.file?.canonicalPath?.indexOf(RESOURCES_WITH_MUSTACHE_PREFIX_PATH, 0, false) == 0
+          it.file == editorFile && isFileUnderResourcesPathWithPrefix(project, it.file)
         }) {
         println("processFileIncludePropsMap after any files modification under resources folder")
         mustacheIncludeProcessor.processFileIncludePropsMap()
         println("Target file ${editorFile.canonicalPath} changed. Reloading current view.")
         val mustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(editorFile)
         mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(mustacheFileRoots)
-        project.messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC)
-          .mustacheFileContentChangedFirstStep()
-        project.messageBus.syncPublisher(MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC)
-          .mustacheFileContentChangedSecondStep(mustacheFileRoots)
-        project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-          .refresh()
+        project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).tabsUpdated()
+        project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(mustacheFileRoots)
+        project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
       }
     }
-  }
-
-  fun interface MustacheFileListenerFirstStep {
-    fun mustacheFileContentChangedFirstStep()
-  }
-
-  fun interface MustacheFileListenerSecondStep {
-    fun mustacheFileContentChangedSecondStep(updatedMustacheFileRoots: Set<String?>)
   }
 
   private fun createEditorBuilder(): AsyncFileEditorProvider.Builder {
@@ -92,8 +84,6 @@ class MustacheFileEditor(
     get() = _textEditorWithPreview
 
   companion object {
-    val MUSTACHE_FILE_LISTENER_FIRST_STEP_TOPIC = Topic(MustacheFileListenerFirstStep::class.java)
-    val MUSTACHE_FILE_LISTENER_SECOND_STEP_TOPIC = Topic(MustacheFileListenerSecondStep::class.java)
     const val NAME = "Mustache Viewer File Editor With Preview"
     private val logger = logger<MustacheFileEditor>()
   }
