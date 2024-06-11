@@ -60,7 +60,7 @@ class MustacheFileEditor(
         println("Target file ${editorFile.canonicalPath} changed. Reloading current view.")
         val mustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(editorFile)
         mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(mustacheFileRoots)
-        project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).tabsUpdated()
+        project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs()
         project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(mustacheFileRoots)
         project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
       }

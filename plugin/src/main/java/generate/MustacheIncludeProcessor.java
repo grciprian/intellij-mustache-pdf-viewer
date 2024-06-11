@@ -41,11 +41,11 @@ public class MustacheIncludeProcessor {
     var root = VfsUtil.findFile(Path.of(RESOURCES_WITH_MUSTACHE_PREFIX_PATH), true);
     Objects.requireNonNull(root, "Root folder FILE_RESOURCES_PATH_WITH_PREFIX " + RESOURCES_WITH_MUSTACHE_PREFIX_PATH + " not found!");
     // TODO alta tratare daca nu e gasit root resources with prefix?
-    VfsUtil.processFileRecursivelyWithoutIgnored(root, virtualFile -> {
-      if (virtualFile.isDirectory()) {
+    VfsUtil.processFileRecursivelyWithoutIgnored(root, mustacheFile -> {
+      if (mustacheFile.isDirectory()) {
         return true;
       }
-      var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(project, virtualFile);
+      var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(project, mustacheFile);
       if (relativePath == null) {
         return true;
       }
@@ -53,7 +53,7 @@ public class MustacheIncludeProcessor {
         includePropsMap.put(relativePath, IncludeProps.getEmpty());
       }
       try {
-        var contents = loadText(virtualFile);
+        var contents = loadText(mustacheFile);
         var first = true;
         for (var include : contents.split("(\\{\\{>)")) {
           if (first) {
@@ -114,7 +114,7 @@ public class MustacheIncludeProcessor {
 
   public VirtualFile processRootPdfFile(String root) {
     if (rootPdfFileMap.get(root) == null || rootPdfFileMap.get(root).expired) {
-      var pdf = getPdf(root);
+      var pdf = getPdf(project, root);
       rootPdfFileMap.put(root, new PdfFileExpirationWrapper(pdf));
     }
     return rootPdfFileMap.get(root).pdf.file();

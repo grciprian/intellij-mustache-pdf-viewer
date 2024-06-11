@@ -2,6 +2,7 @@ package generate;
 
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
@@ -80,9 +81,9 @@ public class PdfGenerationService {
     }
   }
 
-  public PdfContent generatePdf(Object model, VirtualFile mustacheFile) {
+  public PdfContent generatePdf(Project project, Object model, VirtualFile mustacheFile) {
     try (var outputStream = new ByteArrayOutputStream()) {
-      var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(mustacheFile);
+      var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(project, mustacheFile);
       var templateContent = loadText(mustacheFile);
       var template = mustacheCompiler.compile(templateContent);
       var html = template.execute(model);

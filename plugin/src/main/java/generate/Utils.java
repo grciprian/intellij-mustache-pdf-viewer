@@ -55,12 +55,12 @@ public class Utils {
     return canonicalPath.substring(RESOURCES_WITH_MUSTACHE_PREFIX_PATH.length(), extensionPointIndex);
   }
 
-  public static Pdf getPdf(String simpleFilename) {
+  public static Pdf getPdf(Project project, String simpleFilename) {
     try {
       var path = Path.of(RESOURCES_WITH_MUSTACHE_PREFIX_PATH + simpleFilename + "." + MUSTACHE_SUFFIX);
       var mustacheFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(mustacheFile, "mustacheFile for getPdfFile should not be null! Path: " + path);
-      var pdfContent = PdfGenerationService.getInstance().generatePdf(EMPTY_MAP, mustacheFile);
+      var pdfContent = PdfGenerationService.getInstance().generatePdf(project, EMPTY_MAP, mustacheFile);
       var outputPath = Path.of(simpleFilename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX); // mtf MustacheTemporaryFile
       if (!Files.exists(outputPath)) Files.createFile(outputPath);
       Files.write(outputPath, pdfContent.byteArray());
