@@ -11,6 +11,12 @@ public class PdfStructureService {
   private static final String NAME = "_name";
   private static final String LINE = "_line";
   private static final String TEMPLATE = "_template";
+  private static final Map<String, SEG_TYPE> identifierSegTypeMapper = Map.of(
+    "IncludedTemplateSegment", SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT,
+    "SectionSegment", SEG_TYPE.SECTION_SEGMENT,
+    "InvertedSegment", SEG_TYPE.INVERTED_SEGMENT,
+    "VariableSegment", SEG_TYPE.VARIABLE_SEGMENT
+  );
 
   private PdfStructureService() {
     // this class should not be initialized
@@ -68,10 +74,10 @@ public class PdfStructureService {
       var lineField = getField(clazz, LINE);
       nameField.setAccessible(true);
       lineField.setAccessible(true);
-      return new Structure(parentFragment, (String) nameField.get(seg), (int) lineField.get(seg), SEG_TYPE.getByValue(clazz.getSimpleName()));
+      return new Structure(parentFragment, (String) nameField.get(seg), (int) lineField.get(seg), identifierSegTypeMapper.getOrDefault(clazz.getSimpleName(), null));
     } catch (NoSuchFieldException | IllegalAccessException e) {
 //      System.out.println("No field with the name provided could be found or could not be accessed.");
-      return new Structure(null, null, -1, SEG_TYPE.WHATEVER, null);
+      return Structure.createBlank();
     }
   }
 
@@ -89,45 +95,41 @@ public class PdfStructureService {
   }
 
   private enum SEG_TYPE {
-    INCLUDED_TEMPLATE_SEGMENT("IncludedTemplateSegment"),
-    SECTION_SEGMENT("SectionSegment"),
-    INVERTED_SEGMENT("InvertedSegment"),
-    VARIABLE_SEGMENT("VariableSegment"),
-    WHATEVER("");
+    INCLUDED_TEMPLATE_SEGMENT(">"),
+    SECTION_SEGMENT("#"),
+    INVERTED_SEGMENT("^"),
+    VARIABLE_SEGMENT("");
+
     private final String value;
 
     SEG_TYPE(String value) {
       this.value = value;
     }
 
-    public static SEG_TYPE getByValue(String value) {
-      return Arrays.stream(values()).filter(v -> v.value.equals(value)).findFirst().orElse(WHATEVER);
+    public String getValue() {
+      return value;
     }
   }
 
   public record Structure(String parentFragment, String name, int line, SEG_TYPE segType, List<Structure> structures) {
 
-    private static final Map<SEG_TYPE, String> segTypeMapper = Map.of(
-      SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT, ">",
-      SEG_TYPE.SECTION_SEGMENT, "#",
-      SEG_TYPE.INVERTED_SEGMENT, "^",
-      SEG_TYPE.VARIABLE_SEGMENT, "",
-      SEG_TYPE.WHATEVER, ""
-    );
-
-    public Structure(String parentFragment, String name, int line, SEG_TYPE segType) {
+    Structure(String parentFragment, String name, int line, SEG_TYPE segType) {
       this(parentFragment, name, line, segType, null);
     }
 
+    public static Structure createBlank() {
+      return new Structure(null, null, -1, null, null);
+    }
+
     public static Structure createRootStructure(String root, String selectedNodeName) {
-      var name = selectedNodeName + "@" + root;
-      return new Structure(name, name, -1, SEG_TYPE.WHATEVER);
+      var name = selectedNodeName + " @ " + root;
+      return new Structure(name, name, -1, null, null);
     }
 
     @Override
     public String toString() {
       if (line == -1) return name;
-      var segT = Optional.ofNullable(segType).map(segTypeMapper::get).orElse("");
+      var segT = Optional.ofNullable(segType).map(SEG_TYPE::getValue).orElse("");
       return "%s%s, line=%d".formatted(segT, name, line);
     }
 
