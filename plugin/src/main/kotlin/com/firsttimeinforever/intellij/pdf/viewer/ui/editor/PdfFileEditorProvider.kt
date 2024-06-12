@@ -12,7 +12,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
-import generate.Utils.getResourcesWithMustachePrefixPath
+import generate.Utils.getTemplatesPath
 
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
@@ -27,7 +27,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
     return try {
       MUSTAHCE_PREFIX = instance.customMustachePrefix
       MUSTACHE_SUFFIX = instance.customMustacheSuffix
-      RESOURCES_WITH_MUSTACHE_PREFIX_PATH = getResourcesWithMustachePrefixPath(project, file)
+      TEMPLATES_PATH = getTemplatesPath(project, file)
       mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX
     } catch (e: Exception) {
       // log maybe? or not
@@ -68,4 +68,4 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
 lateinit var MUSTACHE_SUFFIX: String
 lateinit var MUSTAHCE_PREFIX: String
-lateinit var RESOURCES_WITH_MUSTACHE_PREFIX_PATH: String
+lateinit var TEMPLATES_PATH: String

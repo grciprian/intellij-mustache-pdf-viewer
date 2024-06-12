@@ -23,7 +23,7 @@ public class Utils {
   }
 
   // TODO maybe rethink this?
-  public static String getResourcesWithMustachePrefixPath(Project project, VirtualFile virtualFile) {
+  public static String getTemplatesPath(Project project, VirtualFile virtualFile) {
     // maybe this is not the way. maybe another kind of path should be used for system specific
     var projectPath = project.getBasePath();
     var filePath = virtualFile.getCanonicalPath();
@@ -35,29 +35,30 @@ public class Utils {
     throw new RuntimeException("File is not in the resources folder of the java project!");
   }
 
-  public static boolean isFileUnderResourcesPathWithPrefix(Project project, VirtualFile virtualFile) {
+  public static boolean isFilePathUnderTemplatesPath(Project project, VirtualFile virtualFile) {
     try {
-      getResourcesWithMustachePrefixPath(project, virtualFile);
+      if(virtualFile == null) return false;
+      getTemplatesPath(project, virtualFile);
       return true;
     } catch (Exception e) {
       return false;
     }
   }
 
-  public static String getRelativePathFromResourcePathWithMustachePrefixPath(Project project, VirtualFile virtualFile) {
-    if (!isFileUnderResourcesPathWithPrefix(project, virtualFile)) return null;
+  public static String getRelativeFilePathFromTemplatesPath(Project project, VirtualFile virtualFile) {
+    if (!isFilePathUnderTemplatesPath(project, virtualFile)) return null;
     var canonicalPath = virtualFile.getCanonicalPath();
     Objects.requireNonNull(canonicalPath, "Could not getRelativePathFromResourcePathWithPrefix because canonicalPath of virtualFile is null!");
     var extensionPointIndex = StringUtilRt.lastIndexOf(canonicalPath, '.', 0, canonicalPath.length());
     if (extensionPointIndex < 0) return null;
     var extension = canonicalPath.subSequence(extensionPointIndex + 1, canonicalPath.length());
     if (!MUSTACHE_SUFFIX.contentEquals(extension)) return null;
-    return canonicalPath.substring(RESOURCES_WITH_MUSTACHE_PREFIX_PATH.length(), extensionPointIndex);
+    return canonicalPath.substring(TEMPLATES_PATH.length(), extensionPointIndex);
   }
 
   public static Pdf getPdf(Project project, String simpleFilename) {
     try {
-      var path = Path.of(RESOURCES_WITH_MUSTACHE_PREFIX_PATH + simpleFilename + "." + MUSTACHE_SUFFIX);
+      var path = Path.of(TEMPLATES_PATH + simpleFilename + "." + MUSTACHE_SUFFIX);
       var mustacheFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(mustacheFile, "mustacheFile for getPdfFile should not be null! Path: " + path);
       var pdfContent = PdfGenerationService.getInstance().generatePdf(project, EMPTY_MAP, mustacheFile);

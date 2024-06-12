@@ -11,10 +11,10 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.RESOURCES_WITH_MUSTACHE_PREFIX_PATH;
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.TEMPLATES_PATH;
 import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
 import static generate.Utils.getPdf;
-import static generate.Utils.getRelativePathFromResourcePathWithMustachePrefixPath;
+import static generate.Utils.getRelativeFilePathFromTemplatesPath;
 
 public class MustacheIncludeProcessor {
 
@@ -25,7 +25,7 @@ public class MustacheIncludeProcessor {
   private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
 
   private MustacheIncludeProcessor(Project project) {
-    Objects.requireNonNull(RESOURCES_WITH_MUSTACHE_PREFIX_PATH, "FILE_RESOURCES_PATH_WITH_PREFIX must not be null!");
+    Objects.requireNonNull(TEMPLATES_PATH, "FILE_RESOURCES_PATH_WITH_PREFIX must not be null!");
     this.project = project;
     processFileIncludePropsMap();
   }
@@ -38,14 +38,14 @@ public class MustacheIncludeProcessor {
 
   public void processFileIncludePropsMap() {
     includePropsMap.clear();
-    var root = VfsUtil.findFile(Path.of(RESOURCES_WITH_MUSTACHE_PREFIX_PATH), true);
-    Objects.requireNonNull(root, "Root folder FILE_RESOURCES_PATH_WITH_PREFIX " + RESOURCES_WITH_MUSTACHE_PREFIX_PATH + " not found!");
+    var root = VfsUtil.findFile(Path.of(TEMPLATES_PATH), true);
+    Objects.requireNonNull(root, "Root folder FILE_RESOURCES_PATH_WITH_PREFIX " + TEMPLATES_PATH + " not found!");
     // TODO alta tratare daca nu e gasit root resources with prefix?
     VfsUtil.processFileRecursivelyWithoutIgnored(root, mustacheFile -> {
       if (mustacheFile.isDirectory()) {
         return true;
       }
-      var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(project, mustacheFile);
+      var relativePath = getRelativeFilePathFromTemplatesPath(project, mustacheFile);
       if (relativePath == null) {
         return true;
       }
@@ -99,7 +99,7 @@ public class MustacheIncludeProcessor {
   }
 
   public Set<String> getRootsForMustache(VirtualFile file) {
-    var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(project, file);
+    var relativePath = getRelativeFilePathFromTemplatesPath(project, file);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
@@ -109,7 +109,10 @@ public class MustacheIncludeProcessor {
   public void tryInvalidateRootPdfsForMustacheRoots(Set<String> roots) {
     roots.stream()
       .filter(rootPdfFileMap::containsKey)
-      .forEach(v -> Optional.ofNullable(rootPdfFileMap.get(v)).ifPresent(t -> t.expired = true));
+      .forEach(v -> {
+        var pdfFileExpirationWrapper = rootPdfFileMap.get(v);
+        if(pdfFileExpirationWrapper != null) pdfFileExpirationWrapper.expired = true;
+      });
   }
 
   public VirtualFile processRootPdfFile(String root) {

@@ -2,7 +2,7 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.RESOURCES_WITH_MUSTACHE_PREFIX_PATH
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.TEMPLATES_PATH
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -118,7 +118,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         val node = path.lastPathComponent as MustacheTreeNode
         val nodeStructure = node.userObject as Structure
         val relativePath = nodeStructure.parentFragment
-        val file = VfsUtil.findFile(Path.of("$RESOURCES_WITH_MUSTACHE_PREFIX_PATH$relativePath.$MUSTACHE_SUFFIX"), true)
+        val file = VfsUtil.findFile(Path.of("$TEMPLATES_PATH$relativePath.$MUSTACHE_SUFFIX"), true)
           ?: return
         val line = if (nodeStructure.line > 0) nodeStructure.line - 1 else 0
         val editor =

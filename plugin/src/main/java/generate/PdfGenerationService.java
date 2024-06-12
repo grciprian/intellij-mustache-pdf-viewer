@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
-import static generate.Utils.getRelativePathFromResourcePathWithMustachePrefixPath;
+import static generate.Utils.getRelativeFilePathFromTemplatesPath;
 
 public class PdfGenerationService {
 
@@ -83,7 +83,7 @@ public class PdfGenerationService {
 
   public PdfContent generatePdf(Project project, Object model, VirtualFile mustacheFile) {
     try (var outputStream = new ByteArrayOutputStream()) {
-      var relativePath = getRelativePathFromResourcePathWithMustachePrefixPath(project, mustacheFile);
+      var relativePath = getRelativeFilePathFromTemplatesPath(project, mustacheFile);
       var templateContent = loadText(mustacheFile);
       var template = mustacheCompiler.compile(templateContent);
       var html = template.execute(model);

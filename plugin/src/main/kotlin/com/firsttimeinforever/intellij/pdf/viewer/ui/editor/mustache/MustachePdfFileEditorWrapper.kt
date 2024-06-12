@@ -14,7 +14,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
-import generate.Utils.getRelativePathFromResourcePathWithMustachePrefixPath
+import generate.Utils.getRelativeFilePathFromTemplatesPath
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableSet
 import javax.swing.DefaultSingleSelectionModel
@@ -51,7 +51,7 @@ class MustachePdfFileEditorWrapper(
       if (source !is DefaultSingleSelectionModel) return@addChangeListener
       if (jbTabbedPane.selectedIndex < 0 || jbTabbedPane.selectedIndex >= syncedTabbedEditors.size) return@addChangeListener
       val root = syncedTabbedEditors[source.selectedIndex].rootName
-      val selectedNodeName = getRelativePathFromResourcePathWithMustachePrefixPath(project, mustacheFile)
+      val selectedNodeName = getRelativeFilePathFromTemplatesPath(project, mustacheFile)
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
         .rootChanged(root, selectedNodeName)
     }
