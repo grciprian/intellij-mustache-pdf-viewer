@@ -72,7 +72,8 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
           private fun handleTreeInContentPanel(root: String, selectedNodeName: String?) {
             if (_contentPanel.components.isNotEmpty()) _contentPanel.remove(0)
-            _contentPanel.add(createTree(root, selectedNodeName))
+            val tree = createTree(root, selectedNodeName)
+            if(tree != null) _contentPanel.add(tree)
           }
         })
     }

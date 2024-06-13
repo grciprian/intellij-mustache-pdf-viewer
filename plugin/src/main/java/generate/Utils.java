@@ -35,7 +35,7 @@ public class Utils {
     throw new RuntimeException("File is not in the resources folder of the java project!");
   }
 
-  public static boolean isFilePathUnderTemplatesPath(Project project, VirtualFile virtualFile) {
+  private static boolean isFilePathUnderTemplatesPath(Project project, VirtualFile virtualFile) {
     try {
       if(virtualFile == null) return false;
       getTemplatesPath(project, virtualFile);
@@ -56,13 +56,13 @@ public class Utils {
     return canonicalPath.substring(TEMPLATES_PATH.length(), extensionPointIndex);
   }
 
-  public static Pdf getPdf(Project project, String simpleFilename) {
+  public static Pdf getPdf(Project project, String filename) {
     try {
-      var path = Path.of(TEMPLATES_PATH + simpleFilename + "." + MUSTACHE_SUFFIX);
+      var path = Path.of(TEMPLATES_PATH + filename + "." + MUSTACHE_SUFFIX);
       var mustacheFile = VfsUtil.findFile(path, true);
       Objects.requireNonNull(mustacheFile, "mustacheFile for getPdfFile should not be null! Path: " + path);
       var pdfContent = PdfGenerationService.getInstance().generatePdf(project, EMPTY_MAP, mustacheFile);
-      var outputPath = Path.of(simpleFilename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX); // mtf MustacheTemporaryFile
+      var outputPath = Path.of(filename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX); // mtf MustacheTemporaryFile
       if (!Files.exists(outputPath)) Files.createFile(outputPath);
       Files.write(outputPath, pdfContent.byteArray());
       return new Pdf(VfsUtil.findFile(outputPath, true), pdfContent.structures());

@@ -82,6 +82,7 @@ public class MustacheIncludeProcessor {
     //orice includeProp daca nu are roots atunci este root si il adaugam ca atare
     var newRootPdfFileMap = new HashMap<String, VirtualFile>();
     includePropsMap.forEach((name, includeProps) -> {
+      //daca este root atunci roots in punctul asta e empty si el este rootul lui
       if (includeProps.roots.isEmpty()) {
         includeProps.roots.add(name);
         //de asemenea se actualizeaza rootPdfFileMap
@@ -103,7 +104,8 @@ public class MustacheIncludeProcessor {
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
-      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getCanonicalPath()));
+      .orElse(Set.of());
+//      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getCanonicalPath()));
   }
 
   public void tryInvalidateRootPdfsForMustacheRoots(Set<String> roots) {
@@ -115,7 +117,7 @@ public class MustacheIncludeProcessor {
       });
   }
 
-  public VirtualFile processRootPdfFile(String root) {
+  public VirtualFile processPdfFileForMustacheRoot(String root) {
     if (rootPdfFileMap.get(root) == null || rootPdfFileMap.get(root).expired) {
       var pdf = getPdf(project, root);
       rootPdfFileMap.put(root, new PdfFileExpirationWrapper(pdf));

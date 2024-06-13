@@ -26,9 +26,11 @@ import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
 import com.intellij.openapi.wm.ToolWindowManager
 import generate.MustacheIncludeProcessor
-import generate.Utils.*
+import generate.Utils.MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX
+import generate.Utils.getRelativeFilePathFromTemplatesPath
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.HashSet
 
 @Service(Service.Level.PROJECT)
 class MustacheContextServiceImpl(private val project: Project) : MustacheContextService, Disposable {
@@ -36,8 +38,9 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   private val settings = PdfViewerSettings.instance
   private val fileChangedListener = FileChangedListener()
   private val appLifecycleListener = MyAppLifecycleListener()
-  private val fileEditorManagerListener = MyFileEditorManagerListener()
   private val messageBusConnection = project.messageBus.connect()
+  private val fileEditorManagerListener = MyFileEditorManagerListener()
+  private val fileEditorManager = FileEditorManager.getInstance(project)
   private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(project);
   private var toolWindowInitialized = false
   private var selectedEditor: TextEditorWithPreview? = null
@@ -52,7 +55,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   }
 
   private inner class MyAppLifecycleListener : AppLifecycleListener {
-
     override fun appClosing() {
       cleanupMtfPdf()
     }
@@ -68,36 +70,43 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   }
 
   private inner class FileChangedListener : BulkFileListener {
-
-
-
     override fun after(events: MutableList<out VFileEvent>) {
-      watchPath(settings.customMustacheFontsPath, events) { settings.notifyMustacheFontsPathSettingsListeners() }
-      watchPath(TEMPLATES_PATH, events) {
-        println("Target file ${it?.canonicalPath} changed. Reloading current view.")
-        manageForFile(it)
-//        project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(mustacheFileRoots)
+      watchPath(
+        settings.customMustacheFontsPath, events
+      ) { _, _ -> settings.notifyMustacheFontsPathSettingsListeners() }
+      watchPath(
+        TEMPLATES_PATH, events
+      ) { file, event ->
+        println("Target file ${file?.canonicalPath} changed. Reloading current view.")
+        file ?: return@watchPath
+        manageForFile(file)
+        if (fileEditorManager.isFileOpen(file)
+          && fileEditorManager.(file) != null // todo
+          && listOf(WatcherFileEvent.MOVE_OUT, WatcherFileEvent.MOVE_IN).contains(event)) {
+          fileEditorManager.closeFile(file)
+          fileEditorManager.openTextEditor(OpenFileDescriptor(project, file), true)
+        }
       }
     }
 
     private fun manageForFile(file: VirtualFile?) {
-      if(file == null) return
-      if(!isFilePathUnderTemplatesPath(project, file)) {
-        FileEditorManager.getInstance(project).closeFile(file)
-        FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, file), true)
-      } else {
-
-      }
-//      val oldMustacheFileRoots = _mustacheIncludeProcessor.getRootsForMustache(file)
+      val oldMustacheFileRoots = _mustacheIncludeProcessor.getRootsForMustache(file)
       _mustacheIncludeProcessor.processFileIncludePropsMap()
-      val newMustacheFileRoots = _mustacheIncludeProcessor.getRootsForMustache(file)
-      _mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(newMustacheFileRoots)
-      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs()
+      val updatedMustacheFileRoots = _mustacheIncludeProcessor.getRootsForMustache(file)
+      val needUpdateMustacheFileRoots = HashSet<String>()
+      needUpdateMustacheFileRoots.addAll(oldMustacheFileRoots)
+      needUpdateMustacheFileRoots.addAll(updatedMustacheFileRoots)
+      _mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(needUpdateMustacheFileRoots)
+
+      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs(updatedMustacheFileRoots)
+//      project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(mustacheFileRoots)
+
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
     }
 
     private fun watchPath(watchedPath: String, events: MutableList<out VFileEvent>, fileWatcher: FileWatcher) {
       var file: VirtualFile? = null
+      var event = WatcherFileEvent.CHANGE_INSIDE
       val canonicalFilePath = Path.of(watchedPath).toCanonicalPath()
 
       fun checkFilePathWithWatchedPathBasedOnFileType(eventFilePath: String, isDirectory: Boolean): Boolean {
@@ -110,8 +119,15 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           file = it.file ?: return
           val isDirectory = file!!.isDirectory
           if (it is VFileMoveEvent) {
-            return@any (checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
-              || checkFilePathWithWatchedPathBasedOnFileType(it.newPath, isDirectory))
+            val oldPathCheck = checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
+            val newPathCheck = checkFilePathWithWatchedPathBasedOnFileType(it.newPath, isDirectory)
+            if (oldPathCheck && !newPathCheck) {
+              event = WatcherFileEvent.MOVE_OUT
+            }
+            if (!oldPathCheck && newPathCheck) {
+              event = WatcherFileEvent.MOVE_IN
+            }
+            return@any (oldPathCheck || newPathCheck)
           }
           if (it is VFilePropertyChangeEvent) {
             return@any (checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
@@ -122,7 +138,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           }
           return@any checkFilePathWithWatchedPathBasedOnFileType(file!!.canonicalPath ?: "", isDirectory)
         }) {
-        fileWatcher.run(file)
+        fileWatcher.run(file, event)
       }
 
 //      if (events.any {
@@ -184,12 +200,14 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
   companion object {
 
-    enum class FileEvent {
-
+    enum class WatcherFileEvent {
+      MOVE_IN,
+      MOVE_OUT,
+      CHANGE_INSIDE
     }
 
     fun interface FileWatcher {
-      fun run(file: VirtualFile?, event: FileEvent)
+      fun run(file: VirtualFile?, event: WatcherFileEvent)
     }
   }
 }

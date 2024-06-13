@@ -35,14 +35,14 @@ class MustachePdfFileEditorWrapper(
     mustacheIncludeProcessor.getRootsForMustache(mustacheFile).forEach { addPdfFileEditorTab(it) }
     messageBusConnection.subscribe(
       MustacheUpdatePdfFileEditorTabs.TOPIC,
-      MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs() }
+      MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs(it) }
     )
     messageBusConnection.subscribe(
       PdfViewerSettings.TOPIC_MUSTACHE,
       PdfViewerMustacheFontsPathSettingsListener {
         val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableSet()
         mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(syncedTabbedRootNames)
-        syncedTabbedRootNames.forEach { mustacheIncludeProcessor.processRootPdfFile(it) }
+        syncedTabbedRootNames.forEach { mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
         project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(syncedTabbedRootNames)
       }
     )
@@ -57,7 +57,10 @@ class MustachePdfFileEditorWrapper(
     }
   }
 
-  private fun updatePdfFileEditorTabs() {
+  private fun updatePdfFileEditorTabs(updatedMustacheFileRoots: Set<String?>) {
+
+    if(updatedMustacheFileRoots.isEmpty()) return
+
     val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile)
     val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableList()
 
@@ -67,7 +70,7 @@ class MustachePdfFileEditorWrapper(
 
     // if source fileRoots intersects this PdfFileEditorWrapper target fileRoots
     // then the mustache file that was modified impacted
-    livingRoots.forEach { mustacheIncludeProcessor.processRootPdfFile(it) }
+    livingRoots.forEach { mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
 
     // remove roots not needed anymore
     var i = 0
@@ -90,7 +93,7 @@ class MustachePdfFileEditorWrapper(
   }
 
   private fun addPdfFileEditorTab(rootName: String) {
-    val pdfFile = mustacheIncludeProcessor.processRootPdfFile(rootName)
+    val pdfFile = mustacheIncludeProcessor.processPdfFileForMustacheRoot(rootName)
     val editor = PdfFileEditor(project, pdfFile, rootName)
     Disposer.register(this, editor)
     jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
