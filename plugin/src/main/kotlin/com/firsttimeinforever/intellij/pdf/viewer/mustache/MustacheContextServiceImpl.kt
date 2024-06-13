@@ -3,10 +3,10 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.TEMPLATES_PATH
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustachePdfFileEditorWrapper
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheRefreshPdfFileEditorTabs
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheUpdatePdfFileEditorTabs
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
@@ -30,7 +30,6 @@ import generate.Utils.MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX
 import generate.Utils.getRelativeFilePathFromTemplatesPath
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.HashSet
 
 @Service(Service.Level.PROJECT)
 class MustacheContextServiceImpl(private val project: Project) : MustacheContextService, Disposable {
@@ -42,8 +41,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   private val fileEditorManagerListener = MyFileEditorManagerListener()
   private val fileEditorManager = FileEditorManager.getInstance(project)
   private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(project);
-  private var toolWindowInitialized = false
-  private var selectedEditor: TextEditorWithPreview? = null
 
   init {
     Disposer.register(this, messageBusConnection)
@@ -63,7 +60,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       val root = VfsUtil.findFile(Path.of("./"), true) as VirtualFile
       VfsUtil.processFileRecursivelyWithoutIgnored(root) {
         if (it.isDirectory) return@processFileRecursivelyWithoutIgnored true
-        if (it.name.contains(MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)) Files.deleteIfExists(it.toNioPath())
+        if (it.name.endsWith(MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)) Files.deleteIfExists(it.toNioPath())
         return@processFileRecursivelyWithoutIgnored true
       }
     }
@@ -81,10 +78,12 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         file ?: return@watchPath
         manageForFile(file)
         if (fileEditorManager.isFileOpen(file)
-          && fileEditorManager.(file) != null // todo
-          && listOf(WatcherFileEvent.MOVE_OUT, WatcherFileEvent.MOVE_IN).contains(event)) {
+          && listOf(WatcherFileEvent.MOVE_OUT, WatcherFileEvent.MOVE_IN).contains(event)
+        ) {
+          val focusEditor = file.extension == MUSTACHE_SUFFIX
+            && fileEditorManager.selectedEditor?.file?.canonicalPath?.equals(file.canonicalPath) == true //todo review this
           fileEditorManager.closeFile(file)
-          fileEditorManager.openTextEditor(OpenFileDescriptor(project, file), true)
+          fileEditorManager.openTextEditor(OpenFileDescriptor(project, file), focusEditor)
         }
       }
     }
@@ -98,13 +97,12 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       needUpdateMustacheFileRoots.addAll(updatedMustacheFileRoots)
       _mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(needUpdateMustacheFileRoots)
 
-      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs(updatedMustacheFileRoots)
-//      project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(mustacheFileRoots)
-
+      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs()
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
     }
 
     private fun watchPath(watchedPath: String, events: MutableList<out VFileEvent>, fileWatcher: FileWatcher) {
+
       var file: VirtualFile? = null
       var event = WatcherFileEvent.CHANGE_INSIDE
       val canonicalFilePath = Path.of(watchedPath).toCanonicalPath()
@@ -140,33 +138,26 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         }) {
         fileWatcher.run(file, event)
       }
-
-//      if (events.any {
-//        isFilePathUnderResourcesPathWithPrefix(project, it.file)
-//      }) {
-//        // TODO keep in mind operation concurrency?
-//        // redoing mustache dependency tree
-////        val mustacheFileRoots = _mustacheIncludeProcessor.getRootsForMustache(editorFile)
-////        _mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(mustacheFileRoots)
-////        _mustacheIncludeProcessor.processFileIncludePropsMap()
-//      }
     }
   }
 
   private inner class MyFileEditorManagerListener : FileEditorManagerListener {
+
+    private var toolWindowInitialized = false
+
     override fun selectionChanged(event: FileEditorManagerEvent) {
-      selectedEditor = if (event.newEditor is TextEditorWithPreview
+      val selectedEditor = if (event.newEditor is TextEditorWithPreview
         && (event.newEditor as TextEditorWithPreview).name == MustacheFileEditor.NAME
       ) event.newEditor as TextEditorWithPreview else null
-      manageMustacheFileEditors()
-      manageMustacheToolWindow()
+      manageMustacheFileEditors(selectedEditor)
+      manageMustacheToolWindow(selectedEditor)
     }
 
-    private fun manageMustacheFileEditors() {
-
+    private fun manageMustacheFileEditors(selectedEditor: TextEditorWithPreview?) {
+      //TODO: poate un mecanism prin care tabul selectat al unui editor selectat sa faca refresh doar in cazul in care este selectat
     }
 
-    private fun manageMustacheToolWindow() {
+    private fun manageMustacheToolWindow(selectedEditor: TextEditorWithPreview?) {
       var root: String? = null
       if (selectedEditor != null) {
         if (!toolWindowInitialized) {
@@ -175,8 +166,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           toolWindow?.setAvailable(true, null)
           toolWindow?.show()
         }
-        root = (selectedEditor!!.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot ?: return
-        val selectedNodeName = getRelativeFilePathFromTemplatesPath(project, selectedEditor!!.file)
+        root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot ?: return
+        val selectedNodeName = getRelativeFilePathFromTemplatesPath(project, selectedEditor.file)
         ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
           .rootChanged(root, selectedNodeName)
       }

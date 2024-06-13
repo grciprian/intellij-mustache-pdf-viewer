@@ -35,7 +35,7 @@ class MustachePdfFileEditorWrapper(
     mustacheIncludeProcessor.getRootsForMustache(mustacheFile).forEach { addPdfFileEditorTab(it) }
     messageBusConnection.subscribe(
       MustacheUpdatePdfFileEditorTabs.TOPIC,
-      MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs(it) }
+      MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs() }
     )
     messageBusConnection.subscribe(
       PdfViewerSettings.TOPIC_MUSTACHE,
@@ -57,10 +57,7 @@ class MustachePdfFileEditorWrapper(
     }
   }
 
-  private fun updatePdfFileEditorTabs(updatedMustacheFileRoots: Set<String?>) {
-
-    if(updatedMustacheFileRoots.isEmpty()) return
-
+  private fun updatePdfFileEditorTabs() {
     val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile)
     val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableList()
 
@@ -88,8 +85,10 @@ class MustachePdfFileEditorWrapper(
     newRoots.forEach { rootName -> addPdfFileEditorTab(rootName!!) }
 
     // refresh living roots tabs
-    project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(livingRoots)
-    jbTabbedPane.selectedIndex = 0
+    if (livingRoots.isNotEmpty()) {
+      project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(livingRoots)
+      jbTabbedPane.selectedIndex = 0
+    }
   }
 
   private fun addPdfFileEditorTab(rootName: String) {
