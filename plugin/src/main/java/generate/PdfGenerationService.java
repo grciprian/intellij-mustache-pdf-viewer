@@ -83,7 +83,7 @@ public class PdfGenerationService {
 
   public PdfContent generatePdf(Project project, Object model, VirtualFile mustacheFile) {
     try (var outputStream = new ByteArrayOutputStream()) {
-      var relativePath = getRelativeFilePathFromTemplatesPath(project, mustacheFile);
+      var relativePath = getRelativeFilePathFromTemplatesPath(project, mustacheFile.getCanonicalPath());
       var templateContent = loadText(mustacheFile);
       var template = mustacheCompiler.compile(templateContent);
       var html = template.execute(model);

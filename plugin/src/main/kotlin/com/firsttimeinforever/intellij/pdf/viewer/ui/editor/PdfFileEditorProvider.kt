@@ -27,7 +27,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
     return try {
       MUSTAHCE_PREFIX = instance.customMustachePrefix
       MUSTACHE_SUFFIX = instance.customMustacheSuffix
-      TEMPLATES_PATH = getTemplatesPath(project, file)
+      TEMPLATES_PATH = getTemplatesPath(project, file.canonicalPath)
       mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX
     } catch (e: Exception) {
       // log maybe? or not

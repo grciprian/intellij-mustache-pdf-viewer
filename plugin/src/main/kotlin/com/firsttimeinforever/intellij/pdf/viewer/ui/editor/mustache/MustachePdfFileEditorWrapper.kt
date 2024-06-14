@@ -32,7 +32,7 @@ class MustachePdfFileEditorWrapper(
 
   init {
     Disposer.register(this, messageBusConnection)
-    mustacheIncludeProcessor.getRootsForMustache(mustacheFile).forEach { addPdfFileEditorTab(it) }
+    mustacheIncludeProcessor.getRootsForMustache(mustacheFile.canonicalPath).forEach { addPdfFileEditorTab(it) }
     messageBusConnection.subscribe(
       MustacheUpdatePdfFileEditorTabs.TOPIC,
       MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs() }
@@ -51,14 +51,14 @@ class MustachePdfFileEditorWrapper(
       if (source !is DefaultSingleSelectionModel) return@addChangeListener
       if (jbTabbedPane.selectedIndex < 0 || jbTabbedPane.selectedIndex >= syncedTabbedEditors.size) return@addChangeListener
       val root = syncedTabbedEditors[source.selectedIndex].rootName
-      val selectedNodeName = getRelativeFilePathFromTemplatesPath(project, mustacheFile)
+      val selectedNodeName = getRelativeFilePathFromTemplatesPath(project, mustacheFile.canonicalPath)
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
         .rootChanged(root, selectedNodeName)
     }
   }
 
   private fun updatePdfFileEditorTabs() {
-    val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile)
+    val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile.canonicalPath)
     val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableList()
 
     val livingRoots = syncedTabbedRootNames.intersect(updatedRoots)
@@ -85,10 +85,8 @@ class MustachePdfFileEditorWrapper(
     newRoots.forEach { rootName -> addPdfFileEditorTab(rootName!!) }
 
     // refresh living roots tabs
-    if (livingRoots.isNotEmpty()) {
-      project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(livingRoots)
-      jbTabbedPane.selectedIndex = 0
-    }
+    if (livingRoots.isNotEmpty()) project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(livingRoots)
+    if (jbTabbedPane.tabCount > 0) jbTabbedPane.selectedIndex = 0
   }
 
   private fun addPdfFileEditorTab(rootName: String) {

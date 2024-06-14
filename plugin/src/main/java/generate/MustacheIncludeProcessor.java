@@ -22,6 +22,7 @@ public class MustacheIncludeProcessor {
   private static MustacheIncludeProcessor instance;
   private final Project project;
   private final Map<String, PdfFileExpirationWrapper> rootPdfFileMap = new HashMap<>();
+  private final Map<String, MustacheIncludeProcessor.IncludeProps> oldIncludePropsMap = new HashMap<>();
   private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
 
   private MustacheIncludeProcessor(Project project) {
@@ -37,6 +38,8 @@ public class MustacheIncludeProcessor {
   }
 
   public void processFileIncludePropsMap() {
+    oldIncludePropsMap.clear();
+    oldIncludePropsMap.putAll(includePropsMap);
     includePropsMap.clear();
     var root = VfsUtil.findFile(Path.of(TEMPLATES_PATH), true);
     Objects.requireNonNull(root, "Root folder FILE_RESOURCES_PATH_WITH_PREFIX " + TEMPLATES_PATH + " not found!");
@@ -45,7 +48,7 @@ public class MustacheIncludeProcessor {
       if (mustacheFile.isDirectory()) {
         return true;
       }
-      var relativePath = getRelativeFilePathFromTemplatesPath(project, mustacheFile);
+      var relativePath = getRelativeFilePathFromTemplatesPath(project, mustacheFile.getCanonicalPath());
       if (relativePath == null) {
         return true;
       }
@@ -99,8 +102,17 @@ public class MustacheIncludeProcessor {
       .forEach(rootPdfFileMap::remove);
   }
 
-  public Set<String> getRootsForMustache(VirtualFile file) {
-    var relativePath = getRelativeFilePathFromTemplatesPath(project, file);
+  public Set<String> getOldRootsForMustache(String canonicalFilePath) {
+    var relativePath = getRelativeFilePathFromTemplatesPath(project, canonicalFilePath);
+    return oldIncludePropsMap.entrySet().stream()
+      .filter(e -> e.getKey().equals(relativePath)).findAny()
+      .map(v -> v.getValue().getRoots())
+      .orElse(Set.of());
+//      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getCanonicalPath()));
+  }
+
+  public Set<String> getRootsForMustache(String canonicalFilePath) {
+    var relativePath = getRelativeFilePathFromTemplatesPath(project, canonicalFilePath);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
@@ -113,7 +125,7 @@ public class MustacheIncludeProcessor {
       .filter(rootPdfFileMap::containsKey)
       .forEach(v -> {
         var pdfFileExpirationWrapper = rootPdfFileMap.get(v);
-        if(pdfFileExpirationWrapper != null) pdfFileExpirationWrapper.expired = true;
+        if (pdfFileExpirationWrapper != null) pdfFileExpirationWrapper.expired = true;
       });
   }
 
