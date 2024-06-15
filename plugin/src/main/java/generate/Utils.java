@@ -57,7 +57,7 @@ public class Utils {
     try {
       var path = Path.of(TEMPLATES_PATH + filename + "." + MUSTACHE_SUFFIX);
       var mustacheFile = VfsUtil.findFile(path, true);
-      Objects.requireNonNull(mustacheFile, "mustacheFile for getPdfFile should not be null! Path: " + path);
+      Objects.requireNonNull(mustacheFile, "mustacheFile for getPdfFile should not be null: " + path);
       var pdfContent = PdfGenerationService.getInstance().generatePdf(project, EMPTY_MAP, mustacheFile);
       var outputPath = Path.of(filename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX); // mtf MustacheTemporaryFile
       if (!Files.exists(outputPath)) Files.createFile(outputPath);

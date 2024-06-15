@@ -3,7 +3,6 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.TEMPLATES_PATH
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustachePdfFileEditorWrapper
@@ -20,14 +19,12 @@ import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
-import com.intellij.openapi.vfs.newvfs.events.VFileCopyEvent
-import com.intellij.openapi.vfs.newvfs.events.VFileEvent
-import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
-import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
+import com.intellij.openapi.vfs.newvfs.events.*
 import com.intellij.openapi.wm.ToolWindowManager
 import generate.MustacheIncludeProcessor
 import generate.Utils.MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX
 import generate.Utils.getRelativeFilePathFromTemplatesPath
+import io.sentry.util.Objects
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -77,7 +74,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         println("Target file ${file?.canonicalPath} changed. Reloading current view.")
         file ?: return@watchPath
         manageMustacheProcessingForFile(file, event)
-        manageEditorForFile(file, event.type)
+        manageMustacheEditors(file, event.type)
       }
     }
 
@@ -97,9 +94,26 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       event: WatcherFileEvent
     ) {
       val needUpdateMustacheFileRoots = HashSet<String>()
-      fun pushToNeedUpdate(f: VirtualFile) {
+      fun pushToNeedUpdate(f: VirtualFile, rootDir: VirtualFile? = null) {
         var canonicalFilePathForOldRoots = f.canonicalPath
-        if (event.e is VFileMoveEvent) canonicalFilePathForOldRoots = Path.of(event.e.oldPath).toCanonicalPath()
+        if (listOf(WatcherFileEvent.Type.MOVE_INSIDE_PATH, WatcherFileEvent.Type.MOVE_OUT, WatcherFileEvent.Type.CHANGE_NAME_PROPERTY)
+            .contains(event.type)
+        ) {
+          val eOldPath =
+            if (event.e is VFileMoveEvent) event.e.oldPath else if (event.e is VFilePropertyChangeEvent) event.e.oldPath else null
+          if(eOldPath != null) {
+            canonicalFilePathForOldRoots = if (rootDir != null) {
+              val fCanonicalPath = f.canonicalPath
+              val rootCanonicalPath = rootDir.canonicalPath
+              Objects.requireNonNull(rootDir, "rootCanonicalPath must not be null")
+              Objects.requireNonNull(fCanonicalPath, "canonicalPath of child file must not be null")
+              val relativePathFromDirRootToFile = fCanonicalPath!!.substring(rootCanonicalPath!!.length + 1)
+              Path.of(eOldPath).toCanonicalPath() + "/" + relativePathFromDirRootToFile
+            } else {
+              Path.of(eOldPath).toCanonicalPath()
+            }
+          }
+        }
         val oldMustacheFileRoots = _mustacheIncludeProcessor.getOldRootsForMustache(canonicalFilePathForOldRoots)
         val updatedMustacheFileRoots = _mustacheIncludeProcessor.getRootsForMustache(f.canonicalPath)
         needUpdateMustacheFileRoots.addAll(oldMustacheFileRoots)
@@ -108,7 +122,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       if (file.isDirectory) {
         VfsUtil.processFileRecursivelyWithoutIgnored(file) {
           if (it.isDirectory) return@processFileRecursivelyWithoutIgnored true
-          pushToNeedUpdate(it)
+          pushToNeedUpdate(it, file)
           return@processFileRecursivelyWithoutIgnored true
         }
       } else {
@@ -117,20 +131,39 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       _mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(needUpdateMustacheFileRoots)
     }
 
-    private fun manageEditorForFile(
+    //todo daca e director handle
+    private fun manageMustacheEditors(
       file: VirtualFile,
       watcherFileEventType: WatcherFileEvent.Type
     ) {
-      if (fileEditorManager.isFileOpen(file)
-        && listOf(WatcherFileEvent.Type.MOVE_OUT, WatcherFileEvent.Type.MOVE_IN).contains(watcherFileEventType)
-      ) {
-        val selectedEditorFile = fileEditorManager.selectedEditor?.file
-        val focusEditorForMovedFile = file.extension == MUSTACHE_SUFFIX
-          && selectedEditorFile?.canonicalPath?.equals(file.canonicalPath) == true
-        fileEditorManager.closeFile(file)
+      if (!listOf(WatcherFileEvent.Type.MOVE_OUT, WatcherFileEvent.Type.MOVE_IN, WatcherFileEvent.Type.CHANGE_NAME_PROPERTY)
+          .contains(watcherFileEventType)
+      ) return
+
+      var focusEditorForMovedFile = false
+      val selectedEditorFile = fileEditorManager.selectedEditor?.file
+      val switchEditorFiles = HashSet<VirtualFile>()
+      fun pushToSwitchEditor(it: VirtualFile) {
+        if (!fileEditorManager.isFileOpen(it)) return
+        switchEditorFiles.add(it)
+        focusEditorForMovedFile = focusEditorForMovedFile or (selectedEditorFile?.canonicalPath?.equals(it.canonicalPath) == true)
+      }
+
+      if (file.isDirectory) {
+        VfsUtil.processFileRecursivelyWithoutIgnored(file) {
+          if (it.isDirectory) return@processFileRecursivelyWithoutIgnored true
+          pushToSwitchEditor(it)
+          return@processFileRecursivelyWithoutIgnored true
+        }
+      } else {
+        pushToSwitchEditor(file)
+      }
+
+      switchEditorFiles.forEach {
+        fileEditorManager.closeFile(it)
         //https://intellij-support.jetbrains.com/hc/en-us/community/posts/206122419-Opening-file-in-editor-without-moving-focus-to-it
         //a lil bit tricky, has a weird behaviour on tab selection but it works
-        fileEditorManager.openTextEditor(OpenFileDescriptor(project, file), focusEditorForMovedFile)
+        fileEditorManager.openTextEditor(OpenFileDescriptor(project, it), focusEditorForMovedFile)
         if (selectedEditorFile != null && !focusEditorForMovedFile) {
           fileEditorManager.openTextEditor(OpenFileDescriptor(project, selectedEditorFile), true)
         }
@@ -190,9 +223,15 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     private class WatcherFileEvent(val type: Type, val e: VFileEvent) {
       enum class Type {
+        COPY,
+        CREATE,
+        DELETE,
         MOVE_IN,
         MOVE_OUT,
-        CHANGE_INSIDE
+        MOVE_INSIDE_PATH,
+        CHANGE_CONTENT,
+        CHANGE_NAME_PROPERTY,
+        CHANGE_OTHER_PROPERTY
       }
     }
 
@@ -214,27 +253,48 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
       if (events.any {
           file = it.file ?: return
-          event = WatcherFileEvent(WatcherFileEvent.Type.CHANGE_INSIDE, it)
+          event = WatcherFileEvent(WatcherFileEvent.Type.CHANGE_OTHER_PROPERTY, it)
           val isDirectory = file!!.isDirectory
+          if (it is VFileCopyEvent) {
+            event = WatcherFileEvent(WatcherFileEvent.Type.COPY, it)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(it.findCreatedFile()?.canonicalPath ?: "", isDirectory)
+          }
+          if (it is VFileCreateEvent) {
+            event = WatcherFileEvent(WatcherFileEvent.Type.CREATE, it)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(file!!.canonicalPath ?: "", isDirectory)
+          }
+          if (it is VFileDeleteEvent) {
+            event = WatcherFileEvent(WatcherFileEvent.Type.DELETE, it)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(file!!.canonicalPath ?: "", isDirectory)
+          }
           if (it is VFileMoveEvent) {
             val oldPathCheck = checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
             val newPathCheck = checkFilePathWithWatchedPathBasedOnFileType(it.newPath, isDirectory)
-            if (oldPathCheck && !newPathCheck) {
-              event = WatcherFileEvent(WatcherFileEvent.Type.MOVE_OUT, it)
-            }
             if (!oldPathCheck && newPathCheck) {
               event = WatcherFileEvent(WatcherFileEvent.Type.MOVE_IN, it)
             }
+            if (oldPathCheck && !newPathCheck) {
+              event = WatcherFileEvent(WatcherFileEvent.Type.MOVE_OUT, it)
+            }
+            if (oldPathCheck && newPathCheck) {
+              event = WatcherFileEvent(WatcherFileEvent.Type.MOVE_INSIDE_PATH, it)
+            }
             return@any (oldPathCheck || newPathCheck)
           }
+          if (it is VFileContentChangeEvent) {
+            event = WatcherFileEvent(WatcherFileEvent.Type.CHANGE_CONTENT, it)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(file!!.canonicalPath ?: "", isDirectory)
+          }
           if (it is VFilePropertyChangeEvent) {
+            event = if (it.oldPath != it.newPath) {
+              WatcherFileEvent(WatcherFileEvent.Type.CHANGE_NAME_PROPERTY, it)
+            } else {
+              WatcherFileEvent(WatcherFileEvent.Type.CHANGE_OTHER_PROPERTY, it)
+            }
             return@any (checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
               || checkFilePathWithWatchedPathBasedOnFileType(it.newPath, isDirectory))
           }
-          if (it is VFileCopyEvent) {
-            return@any checkFilePathWithWatchedPathBasedOnFileType(it.findCreatedFile()?.canonicalPath ?: "", isDirectory)
-          }
-          return@any checkFilePathWithWatchedPathBasedOnFileType(file!!.canonicalPath ?: "", isDirectory)
+          return@any false
         }) {
         fileWatcher.run(file, event!!)
       }

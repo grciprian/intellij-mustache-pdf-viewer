@@ -155,7 +155,9 @@ public class MustacheIncludeProcessor {
       logger.warn("The root provided may not actually be a root!");
       return null;
     }
-    return rootPdfFileMap.get(root).pdf;
+    return Optional.ofNullable(rootPdfFileMap.get(root))
+      .map(pdfFileExpirationWrapper -> pdfFileExpirationWrapper.pdf)
+      .orElse(null);
   }
 
   public static class PdfFileExpirationWrapper {

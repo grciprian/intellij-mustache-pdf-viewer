@@ -3,8 +3,12 @@ package generate;
 import com.samskivert.mustache.Template;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.lang.reflect.Field;
 import java.util.*;
+
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_SUFFIX;
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.TEMPLATES_PATH;
 
 public class PdfStructureService {
 
@@ -96,10 +100,7 @@ public class PdfStructureService {
   }
 
   private enum SEG_TYPE {
-    INCLUDED_TEMPLATE_SEGMENT(">"),
-    SECTION_SEGMENT("#"),
-    INVERTED_SEGMENT("^"),
-    VARIABLE_SEGMENT("");
+    INCLUDED_TEMPLATE_SEGMENT(">"), SECTION_SEGMENT("#"), INVERTED_SEGMENT("^"), VARIABLE_SEGMENT("");
 
     private final String value;
 
@@ -112,7 +113,23 @@ public class PdfStructureService {
     }
   }
 
-  public record Structure(String parentFragment, String name, int line, SEG_TYPE segType, List<Structure> structures) {
+  public static final class Structure {
+    private final String parentFragment;
+    private final String name;
+    private final int line;
+    private final SEG_TYPE segType;
+    private final List<Structure> structures;
+    // only has meaning if SEG_TYPE is INCLUDED_TEMPLATE_SEGMENT
+    private final boolean isIncludedTemplateSegmentValid;
+
+    public Structure(String parentFragment, String name, int line, SEG_TYPE segType, List<Structure> structures) {
+      this.parentFragment = parentFragment;
+      this.name = name;
+      this.line = line;
+      this.segType = segType;
+      this.structures = structures;
+      this.isIncludedTemplateSegmentValid = SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT.equals(segType) && new File(TEMPLATES_PATH, name + "." + MUSTACHE_SUFFIX).exists();
+    }
 
     Structure(String parentFragment, String name, int line, SEG_TYPE segType) {
       this(parentFragment, name, line, segType, null);
@@ -123,9 +140,7 @@ public class PdfStructureService {
     }
 
     public static Structure createRootStructure(String root, @Nullable String selectedNodeName) {
-      var name = Optional.ofNullable(selectedNodeName)
-        .map(v -> v + " @ " + root)
-        .orElse(root);
+      var name = Optional.ofNullable(selectedNodeName).map(v -> v + " @ " + root).orElse(root);
       return new Structure(name, name, -1, null, null);
     }
 
@@ -147,6 +162,30 @@ public class PdfStructureService {
     @Override
     public int hashCode() {
       return Objects.hash(parentFragment, name, line, segType, structures);
+    }
+
+    public String parentFragment() {
+      return parentFragment;
+    }
+
+    public String name() {
+      return name;
+    }
+
+    public int line() {
+      return line;
+    }
+
+    public SEG_TYPE segType() {
+      return segType;
+    }
+
+    public List<Structure> structures() {
+      return structures;
+    }
+
+    public boolean isIncludedTemplateSegmentValid() {
+      return isIncludedTemplateSegmentValid;
     }
   }
 

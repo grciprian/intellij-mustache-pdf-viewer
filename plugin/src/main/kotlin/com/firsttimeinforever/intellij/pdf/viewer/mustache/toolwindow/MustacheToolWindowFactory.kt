@@ -17,6 +17,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
 import com.jgoodies.common.base.Objects
+import generate.PdfGenerationService
 import generate.PdfStructureService.Structure
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.annotations.Nullable
@@ -24,6 +25,7 @@ import java.awt.GridLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.nio.file.Path
+import java.util.*
 import javax.swing.BorderFactory
 import javax.swing.JPanel
 import javax.swing.JTree
@@ -72,15 +74,21 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
           private fun handleTreeInContentPanel(root: String, selectedNodeName: String?) {
             if (_contentPanel.components.isNotEmpty()) _contentPanel.remove(0)
-            val tree = createTree(root, selectedNodeName)
-            if(tree != null) _contentPanel.add(tree)
+            Optional.ofNullable(mustacheIncludeProcessor.getPdfForRoot(root))
+              .map(PdfGenerationService.Pdf::structures)
+              .map {
+                createTree(root, it, selectedNodeName)
+              }
+              .ifPresentOrElse({
+                _contentPanel.add(it)
+              }, {
+                // smth
+              })
           }
         })
     }
 
-    private fun createTree(root: String, selectedNodeName: String?): JBScrollPane? {
-      val pdf = mustacheIncludeProcessor.getPdfForRoot(root) ?: return null
-      val structures = pdf.structures
+    private fun createTree(root: String, structures: List<Structure>, selectedNodeName: String?): JBScrollPane {
       val selectedNodes = mutableListOf<MustacheTreeNode>()
       val rootNode = MustacheTreeNode(Structure.createRootStructure(root, selectedNodeName))
       populateNodeFromStructures(rootNode, structures) {
@@ -88,7 +96,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
           if (Objects.equals(it.userObject as Structure, _clickedNodeStructure)) selectedNodes.add(it)
           return@populateNodeFromStructures
         }
-        if ((it.userObject as Structure).name == selectedNodeName) selectedNodes.add(it)
+        if ((it.userObject as Structure).name() == selectedNodeName) selectedNodes.add(it)
       }
       _clickedNodeStructure = null
       val tree = Tree(DefaultTreeModel(rootNode))
@@ -118,10 +126,10 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         t.selectionPath = path
         val node = path.lastPathComponent as MustacheTreeNode
         val nodeStructure = node.userObject as Structure
-        val relativePath = nodeStructure.parentFragment
+        val relativePath = nodeStructure.parentFragment()
         val file = VfsUtil.findFile(Path.of("$TEMPLATES_PATH$relativePath.$MUSTACHE_SUFFIX"), true)
           ?: return
-        val line = if (nodeStructure.line > 0) nodeStructure.line - 1 else 0
+        val line = if (nodeStructure.line() > 0) nodeStructure.line() - 1 else 0
         val editor =
           FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, file, line, 0), true)
             ?: return
@@ -148,7 +156,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         for (structure in structures) {
           val newNode = MustacheTreeNode(structure)
           visitor?.visit(newNode)
-          val insideStructures = structure.structures
+          val insideStructures = structure.structures()
           if (insideStructures != null) {
             populateNodeFromStructures(newNode, insideStructures, visitor)
           }
