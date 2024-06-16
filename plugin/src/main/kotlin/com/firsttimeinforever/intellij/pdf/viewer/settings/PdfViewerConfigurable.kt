@@ -32,6 +32,8 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
   override fun apply() {
     val wasSettingsModified = isModified
     val wasMustacheFontsPathModified = settings.customMustacheFontsPath != settingsForm?.customMustacheFontsPath?.get()
+    val wasMustacheFilePropsModified = settings.customMustachePrefix != settingsForm?.customMustachePrefix?.get() ||
+      settings.customMustacheSuffix != settingsForm?.customMustacheSuffix?.get()
     settings.run {
       enableDocumentAutoReload = settingsForm?.enableDocumentAutoReload?.get() ?: enableDocumentAutoReload
       defaultSidebarViewMode = settingsForm?.defaultSidebarViewMode?.get() ?: defaultSidebarViewMode
@@ -52,6 +54,9 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
     }
     if (wasMustacheFontsPathModified) {
       settings.notifyMustacheFontsPathSettingsListeners()
+    }
+    if(wasMustacheFilePropsModified) {
+      settings.notifyMustacheFilePropsSettingsListeners()
     }
   }
 

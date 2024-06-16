@@ -43,7 +43,11 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
   }
 
   fun notifyMustacheFontsPathSettingsListeners() {
-    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE).fontsPathChanged(this)
+    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE_FONTS_PATH).fontsPathChanged(this)
+  }
+
+  fun notifyMustacheFilePropsSettingsListeners() {
+    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE_FILE_PROPS).fontsPathChanged(this)
   }
 
   override fun getState() = this
@@ -54,7 +58,8 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
 
   companion object {
     val TOPIC_SETTINGS = Topic(PdfViewerSettingsListener::class.java)
-    val TOPIC_MUSTACHE = Topic(PdfViewerMustacheFontsPathSettingsListener::class.java)
+    val TOPIC_MUSTACHE_FONTS_PATH = Topic(PdfViewerMustacheFontsPathSettingsListener::class.java)
+    val TOPIC_MUSTACHE_FILE_PROPS = Topic(PdfViewerMustacheFilePropsSettingsListener::class.java)
 
     val instance: PdfViewerSettings
       get() = service()

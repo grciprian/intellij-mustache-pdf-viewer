@@ -2,6 +2,7 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
+import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFilePropsSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.TEMPLATES_PATH
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
@@ -36,6 +37,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   private val appLifecycleListener = MyAppLifecycleListener()
   private val messageBusConnection = project.messageBus.connect()
   private val fileEditorManagerListener = MyFileEditorManagerListener()
+  private val mustacheFilePropsListener = MyPdfViewerMustacheFilePropsSettingsListener()
   private val fileEditorManager = FileEditorManager.getInstance(project)
   private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(project)
 
@@ -45,6 +47,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     messageBusConnection.subscribe(AppLifecycleListener.TOPIC, appLifecycleListener)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
+    messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FILE_PROPS, mustacheFilePropsListener)
     messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileEditorManagerListener)
   }
 
@@ -207,6 +210,14 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         toolWindow?.setAvailable(false, null)
         toolWindow?.hide()
       }
+    }
+  }
+
+  private inner class MyPdfViewerMustacheFilePropsSettingsListener : PdfViewerMustacheFilePropsSettingsListener {
+    override fun fontsPathChanged(settings: PdfViewerSettings) {
+      settings.customMustachePrefix
+      settings.customMustacheSuffix
+      
     }
   }
 

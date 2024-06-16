@@ -38,7 +38,7 @@ class MustachePdfFileEditorWrapper(
       MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs() }
     )
     messageBusConnection.subscribe(
-      PdfViewerSettings.TOPIC_MUSTACHE,
+      PdfViewerSettings.TOPIC_MUSTACHE_FONTS_PATH,
       PdfViewerMustacheFontsPathSettingsListener {
         val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableSet()
         mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(syncedTabbedRootNames)
