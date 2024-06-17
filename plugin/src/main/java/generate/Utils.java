@@ -43,7 +43,7 @@ public class Utils {
     }
   }
 
-  public static String getRelativeFilePathFromTemplatesPath(Project project, String canonicalFilePath) {
+  public static String getRelativeMustacheFilePathFromTemplatesPath(Project project, String canonicalFilePath) {
     if (!isFilePathUnderTemplatesPath(project, canonicalFilePath)) return null;
     Objects.requireNonNull(canonicalFilePath, "Could not getRelativePathFromResourcePathWithPrefix because canonicalPath of virtualFile is null!");
     var extensionPointIndex = StringUtilRt.lastIndexOf(canonicalFilePath, '.', 0, canonicalFilePath.length());

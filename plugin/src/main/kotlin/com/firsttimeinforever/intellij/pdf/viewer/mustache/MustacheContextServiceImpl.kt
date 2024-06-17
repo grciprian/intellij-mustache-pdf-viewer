@@ -3,12 +3,14 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFilePropsSettingsListener
+import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFontsPathSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_PREFIX
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.TEMPLATES_PATH
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustachePdfFileEditorWrapper
+import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheRefreshPdfFileEditorTabs
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheUpdatePdfFileEditorTabs
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
@@ -52,6 +54,15 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FILE_PROPS, mustacheFilePropsListener)
     messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileEditorManagerListener)
+    messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FONTS_PATH, PdfViewerMustacheFontsPathSettingsListener {
+      val syncedTabbedRootNamesFromAllValidEditors =
+        fileEditorManager.allEditors.filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
+          .map { ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).syncedTabbedEditors }.flatten()
+          .map { it.rootName }.toSet()
+      _mustacheIncludeProcessor.invalidateRootPdfsForMustacheRoots(syncedTabbedRootNamesFromAllValidEditors)
+      syncedTabbedRootNamesFromAllValidEditors.forEach { _mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
+      project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(syncedTabbedRootNamesFromAllValidEditors)
+    })
   }
 
   private inner class MyAppLifecycleListener : AppLifecycleListener {
@@ -85,8 +96,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     }
 
     private fun manageMustacheProcessingForFile(
-      file: VirtualFile,
-      event: WatcherFileEvent
+      file: VirtualFile, event: WatcherFileEvent
     ) {
       _mustacheIncludeProcessor.processFileIncludePropsMap()
       invalidateRoots(file, event)
@@ -96,14 +106,16 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     //TODO: optimize all the process chain in the future
     private fun invalidateRoots(
-      file: VirtualFile,
-      event: WatcherFileEvent
+      file: VirtualFile, event: WatcherFileEvent
     ) {
       val needUpdateMustacheFileRoots = HashSet<String>()
       fun pushToNeedUpdate(f: VirtualFile, rootDir: VirtualFile? = null) {
         var canonicalFilePathForOldRoots = f.canonicalPath
-        if (listOf(WatcherFileEvent.Type.MOVE_INSIDE_PATH, WatcherFileEvent.Type.MOVE_OUT, WatcherFileEvent.Type.CHANGE_NAME_PROPERTY)
-            .contains(event.type)
+        if (listOf(
+            WatcherFileEvent.Type.MOVE_INSIDE_PATH,
+            WatcherFileEvent.Type.MOVE_OUT,
+            WatcherFileEvent.Type.CHANGE_NAME_PROPERTY
+          ).contains(event.type)
         ) {
           val eOldPath =
             if (event.e is VFileMoveEvent) event.e.oldPath else if (event.e is VFilePropertyChangeEvent) event.e.oldPath else null
@@ -134,25 +146,21 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       } else {
         pushToNeedUpdate(file)
       }
-      _mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(needUpdateMustacheFileRoots)
+      _mustacheIncludeProcessor.invalidateRootPdfsForMustacheRoots(needUpdateMustacheFileRoots)
     }
 
-    //todo daca e director handle
     private fun manageMustacheEditors(
-      file: VirtualFile,
-      watcherFileEventType: WatcherFileEvent.Type
+      file: VirtualFile, watcherFileEventType: WatcherFileEvent.Type
     ) {
       if (!listOf(WatcherFileEvent.Type.MOVE_OUT, WatcherFileEvent.Type.MOVE_IN, WatcherFileEvent.Type.CHANGE_NAME_PROPERTY)
           .contains(watcherFileEventType)
       ) return
 
-      var focusEditorForMovedFile = false
       val selectedEditorFile = fileEditorManager.selectedEditor?.file
       val switchEditorFiles = HashSet<VirtualFile>()
       fun pushToSwitchEditor(it: VirtualFile) {
         if (!fileEditorManager.isFileOpen(it)) return
         switchEditorFiles.add(it)
-        focusEditorForMovedFile = focusEditorForMovedFile or (selectedEditorFile?.canonicalPath?.equals(it.canonicalPath) == true)
       }
 
       if (file.isDirectory) {
@@ -167,13 +175,14 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
       switchEditorFiles.forEach {
         fileEditorManager.closeFile(it)
-        //https://intellij-support.jetbrains.com/hc/en-us/community/posts/206122419-Opening-file-in-editor-without-moving-focus-to-it
-        //a lil bit tricky, has a weird behaviour on tab selection but it works
-        fileEditorManager.openTextEditor(OpenFileDescriptor(project, it), focusEditorForMovedFile)
-        if (selectedEditorFile != null && !focusEditorForMovedFile) {
-          fileEditorManager.openTextEditor(OpenFileDescriptor(project, selectedEditorFile), true)
-        }
+        fileEditorManager.openTextEditor(
+          OpenFileDescriptor(project, it),
+          selectedEditorFile?.canonicalPath?.equals(it.canonicalPath) == true
+        )
       }
+      // https://intellij-support.jetbrains.com/hc/en-us/community/posts/206122419-Opening-file-in-editor-without-moving-focus-to-it
+      // a lil bit tricky, has a weird behaviour on tab selection? but it works
+      if (selectedEditorFile != null) fileEditorManager.openTextEditor(OpenFileDescriptor(project, selectedEditorFile), true)
     }
   }
 
@@ -182,9 +191,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     private var toolWindowInitialized = false
 
     override fun selectionChanged(event: FileEditorManagerEvent) {
-      val selectedEditor = if (event.newEditor is TextEditorWithPreview
-        && (event.newEditor as TextEditorWithPreview).name == MustacheFileEditor.NAME
-      ) event.newEditor as TextEditorWithPreview else null
+      val selectedEditor =
+        if (event.newEditor is TextEditorWithPreview && (event.newEditor as TextEditorWithPreview).name == MustacheFileEditor.NAME) event.newEditor as TextEditorWithPreview else null
       manageMustacheFileEditors(selectedEditor)
       manageMustacheToolWindow(selectedEditor)
     }
@@ -203,9 +211,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           toolWindow?.show()
         }
         root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot ?: return
-        val selectedNodeName = getRelativeFilePathFromTemplatesPath(project, selectedEditor.file?.canonicalPath)
-        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-          .rootChanged(root, selectedNodeName)
+        val selectedNodeName = getRelativeMustacheFilePathFromTemplatesPath(project, selectedEditor.file?.canonicalPath)
+        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).rootChanged(root, selectedNodeName)
       }
       if (root == null && toolWindowInitialized) {
         toolWindowInitialized = false
@@ -218,60 +225,48 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
   private inner class MyPdfViewerMustacheFilePropsSettingsListener : PdfViewerMustacheFilePropsSettingsListener {
     override fun filePropsChanged(settings: PdfViewerSettings) {
-      val mustacheEditorsFiles = fileEditorManager.allEditors
-        .filter { isFilePathUnderTemplatesPath(project, it.file.canonicalPath) }
-        .map { it.file }
-        .toImmutableSet()
-      val invalidatedRoots = mustacheEditorsFiles.map { _mustacheIncludeProcessor.getRootsForMustache(it.canonicalPath) }
-        .flatten()
-        .toImmutableSet()
+      // get editors for all files under old templates folder and under the new templates folder
+      val beforeModMustacheEditorsFiles =
+        fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(project, it.file.canonicalPath) }.map { it.file }
+          .toImmutableSet()
       MUSTACHE_PREFIX = PdfViewerSettings.instance.customMustachePrefix
       MUSTACHE_SUFFIX = PdfViewerSettings.instance.customMustacheSuffix
-      val afterModMustacheEditorsFiles = fileEditorManager.allEditors
-        .filter { isFilePathUnderTemplatesPath(project, it.file.canonicalPath) }
-        .map { it.file }
-        .toImmutableSet()
-      val afterModInvalidatedRoots = mustacheEditorsFiles.map { _mustacheIncludeProcessor.getRootsForMustache(it.canonicalPath) }
-        .flatten()
-        .toImmutableSet()
-      mustacheEditorsFiles.plus(afterModMustacheEditorsFiles)
-      invalidatedRoots.plus(afterModInvalidatedRoots)
+      val afterModMustacheEditorsFiles =
+        fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(project, it.file.canonicalPath) }.map { it.file }
+          .toImmutableSet()
+      val mustacheEditorsFiles = beforeModMustacheEditorsFiles.plus(afterModMustacheEditorsFiles)
 
-      if(mustacheEditorsFiles.isEmpty()) return
+      // if the editor array is empty then we have nothing to worry about
+      if (mustacheEditorsFiles.isEmpty()) return
 
-      mustacheEditorsFiles.forEach { fileEditorManager.closeFile(it) }
-
-      Optional.ofNullable(mustacheEditorsFiles.firstOrNull())
+      // if we now have an editor open for the new templates folder then we can recalculate TEMPLATES_PATH for specialized mustache editors to open
+      Optional.ofNullable(afterModMustacheEditorsFiles.firstOrNull())
         .ifPresentOrElse(
+          { TEMPLATES_PATH = getTemplatesPath(project, it.canonicalPath) },
           {
-            TEMPLATES_PATH = //todo here
-          },
-          { println("FilePropsChanged: Not editor open so the TEMPLATES_PATH haven't have to be modified right now. It would be updated on the next valid opened mustache.") })
+            println("FilePropsChanged: Not editor open so the TEMPLATES_PATH haven't have to be modified right now. It would be updated on the next valid opened mustache.")
+            TEMPLATES_PATH = null.toString()
+          })
 
+      // reprocess include dependency tree for mustache files under the new templates folder
       _mustacheIncludeProcessor.processFileIncludePropsMap()
-      _mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(invalidatedRoots)
-      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs()
-      project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
+      _mustacheIncludeProcessor.invalidateRootPdfs()
+//      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs()
+//      project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
 
-      var focusEditorForMovedFile = false
+      // we save the selected editor's file for it to be reselected after editors switch
       val selectedEditorFile = fileEditorManager.selectedEditor?.file
-      val switchEditorFiles = HashSet<VirtualFile>()
-      fun pushToSwitchEditor(it: VirtualFile) {
-        if (!fileEditorManager.isFileOpen(it)) return
-        switchEditorFiles.add(it)
-        focusEditorForMovedFile = focusEditorForMovedFile or (selectedEditorFile?.canonicalPath?.equals(it.canonicalPath) == true)
-      }
+      // we should close the editors and reopen them accordingly
       mustacheEditorsFiles.forEach {
-        pushToSwitchEditor(it)
+        fileEditorManager.closeFile(it)
+        fileEditorManager.openTextEditor(
+          OpenFileDescriptor(project, it),
+          selectedEditorFile?.canonicalPath?.equals(it.canonicalPath) == true
+        )
       }
-      switchEditorFiles.forEach {
-        //https://intellij-support.jetbrains.com/hc/en-us/community/posts/206122419-Opening-file-in-editor-without-moving-focus-to-it
-        //a lil bit tricky, has a weird behaviour on tab selection but it works
-        fileEditorManager.openTextEditor(OpenFileDescriptor(project, it), focusEditorForMovedFile)
-        if (selectedEditorFile != null && !focusEditorForMovedFile) {
-          fileEditorManager.openTextEditor(OpenFileDescriptor(project, selectedEditorFile), true)
-        }
-      }
+      // https://intellij-support.jetbrains.com/hc/en-us/community/posts/206122419-Opening-file-in-editor-without-moving-focus-to-it
+      // a lil bit tricky, has a weird behaviour on tab selection? but it works
+      if (selectedEditorFile != null) fileEditorManager.openTextEditor(OpenFileDescriptor(project, selectedEditorFile), true)
     }
   }
 
@@ -288,15 +283,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     private class WatcherFileEvent(val type: Type, val e: VFileEvent) {
       enum class Type {
-        COPY,
-        CREATE,
-        DELETE,
-        MOVE_IN,
-        MOVE_OUT,
-        MOVE_INSIDE_PATH,
-        CHANGE_CONTENT,
-        CHANGE_NAME_PROPERTY,
-        CHANGE_OTHER_PROPERTY
+        COPY, CREATE, DELETE, MOVE_IN, MOVE_OUT, MOVE_INSIDE_PATH, CHANGE_CONTENT, CHANGE_NAME_PROPERTY, CHANGE_OTHER_PROPERTY
       }
     }
 
@@ -356,8 +343,10 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
             } else {
               WatcherFileEvent(WatcherFileEvent.Type.CHANGE_OTHER_PROPERTY, it)
             }
-            return@any (checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
-              || checkFilePathWithWatchedPathBasedOnFileType(it.newPath, isDirectory))
+            return@any (checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory) || checkFilePathWithWatchedPathBasedOnFileType(
+              it.newPath,
+              isDirectory
+            ))
           }
           return@any false
         }) {

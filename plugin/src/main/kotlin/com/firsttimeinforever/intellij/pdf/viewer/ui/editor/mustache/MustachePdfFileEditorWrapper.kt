@@ -2,8 +2,6 @@ package com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
-import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFontsPathSettingsListener
-import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
@@ -14,7 +12,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
-import generate.Utils.getRelativeFilePathFromTemplatesPath
+import generate.Utils.getRelativeMustacheFilePathFromTemplatesPath
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableSet
 import javax.swing.DefaultSingleSelectionModel
@@ -23,8 +21,8 @@ import javax.swing.JComponent
 class MustachePdfFileEditorWrapper(
   private val project: Project, private val mustacheFile: VirtualFile
 ) : FileEditorBase(), DumbAware {
-  private val jbTabbedPane = JBTabbedPane()
-  private val syncedTabbedEditors = mutableListOf<PdfFileEditor>()
+  private val _jbTabbedPane = JBTabbedPane()
+  private val _syncedTabbedEditors = mutableListOf<PdfFileEditor>()
   private val messageBusConnection = project.messageBus.connect()
   private val mustacheContextService = project.service<MustacheContextService>()
   private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
@@ -37,21 +35,12 @@ class MustachePdfFileEditorWrapper(
       MustacheUpdatePdfFileEditorTabs.TOPIC,
       MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs() }
     )
-    messageBusConnection.subscribe(
-      PdfViewerSettings.TOPIC_MUSTACHE_FONTS_PATH,
-      PdfViewerMustacheFontsPathSettingsListener {
-        val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableSet()
-        mustacheIncludeProcessor.tryInvalidateRootPdfsForMustacheRoots(syncedTabbedRootNames)
-        syncedTabbedRootNames.forEach { mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
-        project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(syncedTabbedRootNames)
-      }
-    )
-    jbTabbedPane.model.addChangeListener {
+    _jbTabbedPane.model.addChangeListener {
       val source = it.source
       if (source !is DefaultSingleSelectionModel) return@addChangeListener
-      if (jbTabbedPane.selectedIndex < 0 || jbTabbedPane.selectedIndex >= syncedTabbedEditors.size) return@addChangeListener
-      val root = syncedTabbedEditors[source.selectedIndex].rootName
-      val selectedNodeName = getRelativeFilePathFromTemplatesPath(project, mustacheFile.canonicalPath)
+      if (_jbTabbedPane.selectedIndex < 0 || _jbTabbedPane.selectedIndex >= _syncedTabbedEditors.size) return@addChangeListener
+      val root = _syncedTabbedEditors[source.selectedIndex].rootName
+      val selectedNodeName = getRelativeMustacheFilePathFromTemplatesPath(project, mustacheFile.canonicalPath)
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
         .rootChanged(root, selectedNodeName)
     }
@@ -59,7 +48,7 @@ class MustachePdfFileEditorWrapper(
 
   private fun updatePdfFileEditorTabs() {
     val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile.canonicalPath)
-    val syncedTabbedRootNames = syncedTabbedEditors.map { it.rootName }.toImmutableList()
+    val syncedTabbedRootNames = _syncedTabbedEditors.map { it.rootName }.toImmutableList()
 
     val livingRoots = syncedTabbedRootNames.intersect(updatedRoots)
     val expiredRoots = syncedTabbedRootNames.subtract(updatedRoots)
@@ -71,11 +60,11 @@ class MustachePdfFileEditorWrapper(
 
     // remove roots not needed anymore
     var i = 0
-    while (i < syncedTabbedEditors.size) {
-      if (expiredRoots.contains(syncedTabbedEditors[i].rootName)) {
-        jbTabbedPane.remove(i)
-        Disposer.dispose(syncedTabbedEditors[i])
-        syncedTabbedEditors.removeAt(i)
+    while (i < _syncedTabbedEditors.size) {
+      if (expiredRoots.contains(_syncedTabbedEditors[i].rootName)) {
+        _jbTabbedPane.remove(i)
+        Disposer.dispose(_syncedTabbedEditors[i])
+        _syncedTabbedEditors.removeAt(i)
         i -= 1
       }
       ++i
@@ -86,29 +75,31 @@ class MustachePdfFileEditorWrapper(
 
     // refresh living roots tabs
     if (livingRoots.isNotEmpty()) project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(livingRoots)
-    if (jbTabbedPane.tabCount > 0) jbTabbedPane.selectedIndex = 0
+    if (_jbTabbedPane.tabCount > 0) _jbTabbedPane.selectedIndex = 0
   }
 
   private fun addPdfFileEditorTab(rootName: String) {
     val pdfFile = mustacheIncludeProcessor.processPdfFileForMustacheRoot(rootName)
     val editor = PdfFileEditor(project, pdfFile, rootName)
     Disposer.register(this, editor)
-    jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
-    syncedTabbedEditors.add(ADD_INDEX_FOR_NEW_TAB, editor)
+    _jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
+    _syncedTabbedEditors.add(ADD_INDEX_FOR_NEW_TAB, editor)
   }
 
-  override fun getComponent(): JComponent = jbTabbedPane
+  override fun getComponent(): JComponent = _jbTabbedPane
 
   override fun getName(): String = NAME
 
-  override fun getPreferredFocusedComponent(): JComponent = jbTabbedPane.selectedComponent as PdfEditorViewComponent
+  override fun getPreferredFocusedComponent(): JComponent = _jbTabbedPane.selectedComponent as PdfEditorViewComponent
 
+  val syncedTabbedEditors: MutableList<PdfFileEditor>
+    get() = _syncedTabbedEditors
 
   val activeTab: PdfFileEditor?
-    get() = if (jbTabbedPane.selectedIndex >= 0 && jbTabbedPane.selectedIndex < syncedTabbedEditors.size) syncedTabbedEditors[jbTabbedPane.selectedIndex] else null
+    get() = if (_jbTabbedPane.selectedIndex >= 0 && _jbTabbedPane.selectedIndex < _syncedTabbedEditors.size) _syncedTabbedEditors[_jbTabbedPane.selectedIndex] else null
 
   val activeTabRoot: String?
-    get() = if (jbTabbedPane.selectedIndex >= 0 && jbTabbedPane.selectedIndex < syncedTabbedEditors.size) syncedTabbedEditors[jbTabbedPane.selectedIndex].rootName else null
+    get() = if (_jbTabbedPane.selectedIndex >= 0 && _jbTabbedPane.selectedIndex < _syncedTabbedEditors.size) _syncedTabbedEditors[_jbTabbedPane.selectedIndex].rootName else null
 
   companion object {
     private const val NAME = "Pdf Wrapper Viewer File Editor"

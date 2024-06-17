@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.TEMPLATES_PATH;
 import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
 import static generate.Utils.getPdf;
-import static generate.Utils.getRelativeFilePathFromTemplatesPath;
+import static generate.Utils.getRelativeMustacheFilePathFromTemplatesPath;
 
 public class MustacheIncludeProcessor {
 
@@ -48,7 +48,7 @@ public class MustacheIncludeProcessor {
       if (mustacheFile.isDirectory()) {
         return true;
       }
-      var relativePath = getRelativeFilePathFromTemplatesPath(project, mustacheFile.getCanonicalPath());
+      var relativePath = getRelativeMustacheFilePathFromTemplatesPath(project, mustacheFile.getCanonicalPath());
       if (relativePath == null) {
         return true;
       }
@@ -103,7 +103,7 @@ public class MustacheIncludeProcessor {
   }
 
   public Set<String> getOldRootsForMustache(String canonicalFilePath) {
-    var relativePath = getRelativeFilePathFromTemplatesPath(project, canonicalFilePath);
+    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(project, canonicalFilePath);
     return oldIncludePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
@@ -112,7 +112,7 @@ public class MustacheIncludeProcessor {
   }
 
   public Set<String> getRootsForMustache(String canonicalFilePath) {
-    var relativePath = getRelativeFilePathFromTemplatesPath(project, canonicalFilePath);
+    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(project, canonicalFilePath);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
@@ -120,7 +120,14 @@ public class MustacheIncludeProcessor {
 //      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getCanonicalPath()));
   }
 
-  public void tryInvalidateRootPdfsForMustacheRoots(Set<String> roots) {
+  public void invalidateRootPdfs() {
+    rootPdfFileMap
+      .values().stream()
+      .filter(Objects::nonNull)
+      .forEach(pdfFileExpirationWrapper -> pdfFileExpirationWrapper.expired = true);
+  }
+
+  public void invalidateRootPdfsForMustacheRoots(Set<String> roots) {
     roots.stream()
       .filter(rootPdfFileMap::containsKey)
       .forEach(v -> {
