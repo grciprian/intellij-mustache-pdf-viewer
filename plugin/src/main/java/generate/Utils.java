@@ -27,13 +27,13 @@ public class Utils {
     var projectPath = project.getBasePath();
     Objects.requireNonNull(projectPath, "Could not getFileResourcesPathWithPrefix because path of project is null!");
     Objects.requireNonNull(canonicalFilePath, "Could not getFileResourcesPathWithPrefix because path of virtualFile is null!");
-    var javaResourcesWithMustachePrefix = "/resources/" + MUSTAHCE_PREFIX + "/";
+    var javaResourcesWithMustachePrefix = "/resources/" + MUSTACHE_PREFIX + "/";
     var resourcesIndex = canonicalFilePath.indexOf(javaResourcesWithMustachePrefix, projectPath.length());
     if (resourcesIndex != -1) return canonicalFilePath.substring(0, resourcesIndex + javaResourcesWithMustachePrefix.length());
     throw new RuntimeException("File is not in the resources folder of the java project!");
   }
 
-  private static boolean isFilePathUnderTemplatesPath(Project project, String canonicalFilePath) {
+  public static boolean isFilePathUnderTemplatesPath(Project project, String canonicalFilePath) {
     try {
       if(canonicalFilePath == null) return false;
       getTemplatesPath(project, canonicalFilePath);

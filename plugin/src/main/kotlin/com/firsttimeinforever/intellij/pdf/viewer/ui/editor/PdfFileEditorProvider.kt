@@ -25,7 +25,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   override fun accept(project: Project, file: VirtualFile): Boolean {
     if (file.fileType == PdfFileType) return true
     return try {
-      MUSTAHCE_PREFIX = instance.customMustachePrefix
+      MUSTACHE_PREFIX = instance.customMustachePrefix
       MUSTACHE_SUFFIX = instance.customMustacheSuffix
       TEMPLATES_PATH = getTemplatesPath(project, file.canonicalPath)
       mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX
@@ -66,6 +66,6 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   }
 }
 
-lateinit var MUSTAHCE_PREFIX: String
+lateinit var MUSTACHE_PREFIX: String
 lateinit var MUSTACHE_SUFFIX: String
 lateinit var TEMPLATES_PATH: String

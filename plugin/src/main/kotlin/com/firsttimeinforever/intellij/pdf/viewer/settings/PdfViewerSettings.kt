@@ -47,7 +47,7 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
   }
 
   fun notifyMustacheFilePropsSettingsListeners() {
-    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE_FILE_PROPS).fontsPathChanged(this)
+    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE_FILE_PROPS).filePropsChanged(this)
   }
 
   override fun getState() = this
