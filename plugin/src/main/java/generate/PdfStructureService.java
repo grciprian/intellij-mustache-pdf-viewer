@@ -99,7 +99,7 @@ public class PdfStructureService {
     }
   }
 
-  private enum SEG_TYPE {
+  public enum SEG_TYPE {
     INCLUDED_TEMPLATE_SEGMENT(">"), SECTION_SEGMENT("#"), INVERTED_SEGMENT("^"), VARIABLE_SEGMENT("");
 
     private final String value;

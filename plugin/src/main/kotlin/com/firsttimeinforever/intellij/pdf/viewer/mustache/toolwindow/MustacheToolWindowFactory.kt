@@ -10,6 +10,7 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
@@ -18,6 +19,7 @@ import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
 import com.jgoodies.common.base.Objects
 import generate.PdfGenerationService
+import generate.PdfStructureService.SEG_TYPE
 import generate.PdfStructureService.Structure
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.annotations.Nullable
@@ -50,7 +52,6 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
     private val _contentPanel = JPanel()
     private lateinit var _root: String
     private var _selectedNodeName: String? = null
-    private var _clickedNodeStructure: Structure? = null // higher priority than _selectedNodeName
     private val messageBusConnection = project.messageBus.connect()
     private val mustacheContextService = project.service<MustacheContextService>()
     private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
@@ -92,16 +93,28 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       val selectedNodes = mutableListOf<MustacheTreeNode>()
       val rootNode = MustacheTreeNode(Structure.createRootStructure(root, selectedNodeName))
       populateNodeFromStructures(rootNode, structures) {
-        if (_clickedNodeStructure != null) {
-          if (Objects.equals(it.userObject as Structure, _clickedNodeStructure)) selectedNodes.add(it)
-          return@populateNodeFromStructures
+//        // do not select the (maybe multiple) nodes if ClickedNodeStyle is RIGHT
+//        if (ClickedNodeStyle.RIGHT != _clickedNode.second) return@populateNodeFromStructures
+        if (_clickedNode != Pair.empty<MustacheTreeNode, ClickedNodeStyle>()) {
+          if (Objects.equals(it.userObject as Structure, _clickedNode.first!!.userObject as Structure)) {
+            selectedNodes.add(it)
+          }
+        } else if ((it.userObject as Structure).name() == selectedNodeName) {
+          selectedNodes.add(it)
         }
-        if ((it.userObject as Structure).name() == selectedNodeName) selectedNodes.add(it)
       }
-      _clickedNodeStructure = null
       val tree = Tree(DefaultTreeModel(rootNode))
       tree.addMouseListener(TreeMouseListener(project, this))
+
       expandToPaths(tree, selectedNodes)
+      if ((_clickedNode != Pair.empty<MustacheTreeNode, ClickedNodeStyle>()
+          && (_clickedNode.first!!.userObject as Structure).segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT)
+        && selectedNodes.isNotEmpty() && selectedNodes[0].children().hasMoreElements()
+      ) {
+        tree.expandPath(TreePath(selectedNodes[0].path))
+      }
+      _clickedNode = Pair.empty()
+
       val scrollTree = JBScrollPane(tree)
       scrollTree.border = BorderFactory.createEmptyBorder()
       return scrollTree
@@ -112,35 +125,54 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         handleMouseEvent(e)
       }
 
-      override fun mouseReleased(e: MouseEvent) {
-        handleMouseEvent(e)
-      }
+      private fun handleMouseEvent(e: MouseEvent) {
+        val x = e.x
+        val y = e.y
 
-      private fun handleMouseEvent(mouseEvent: MouseEvent) {
-        if (!mouseEvent.isPopupTrigger) return
-        val x = mouseEvent.x
-        val y = mouseEvent.y
-
-        val t = mouseEvent.source as JTree
+        val t = e.source as JTree
         val path = t.getPathForLocation(x, y) ?: return
         t.selectionPath = path
-        val node = path.lastPathComponent as MustacheTreeNode
-        val nodeStructure = node.userObject as Structure
-        val relativePath = nodeStructure.parentFragment()
-        val file = VfsUtil.findFile(Path.of("$TEMPLATES_PATH$relativePath.$MUSTACHE_SUFFIX"), true)
-          ?: return
-        val line = if (nodeStructure.line() > 0) nodeStructure.line() - 1 else 0
-        val editor =
-          FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, file, line, 0), true)
-            ?: return
-        val document = editor.document
-        val startOffset = document.getLineStartOffset(line)
-        val endOffset = document.getLineEndOffset(line)
-        val selectionModel = editor.selectionModel
-        selectionModel.removeSelection()
-        selectionModel.setSelection(startOffset, endOffset)
 
-        toolWindowContent._clickedNodeStructure = nodeStructure
+        val node = path.lastPathComponent as MustacheTreeNode
+        if (e.button == MouseEvent.BUTTON1) {
+          _clickedNode = Pair(node, ClickedNodeStyle.LEFT)
+          handleLeftClick(node)
+        }
+        if (e.button == MouseEvent.BUTTON3) {
+          _clickedNode = Pair(node, ClickedNodeStyle.RIGHT)
+          handleRightClick(node)
+        }
+      }
+
+      private fun handleLeftClick(node: MustacheTreeNode) {
+        val nodeStructure = node.userObject as Structure
+        if (nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT) {
+          navigateToFile(nodeStructure.name(), 0)
+        } else {
+          navigateToFile(nodeStructure.parentFragment(), nodeStructure.line())
+        }
+      }
+
+      private fun handleRightClick(node: MustacheTreeNode) {
+        val nodeStructure = node.userObject as Structure
+        navigateToFile(nodeStructure.parentFragment(), nodeStructure.line())
+      }
+
+      private fun navigateToFile(mustacheRelativePath: String, line: Int) {
+        val file = VfsUtil.findFile(Path.of("$TEMPLATES_PATH$mustacheRelativePath.$MUSTACHE_SUFFIX"), true)
+          ?: return
+        val ln = if (line > 0) line - 1 else 0
+        val editor =
+          FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, file, ln, 0), true)
+            ?: return
+        if (line > 0) {
+          val document = editor.document
+          val startOffset = document.getLineStartOffset(ln)
+          val endOffset = document.getLineEndOffset(ln)
+          val selectionModel = editor.selectionModel
+          selectionModel.removeSelection()
+          selectionModel.setSelection(startOffset, endOffset)
+        }
       }
     }
 
@@ -148,6 +180,12 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       get() = _contentPanel
 
     companion object {
+
+      private class MustacheTreeNode(userObject: Any) : DefaultMutableTreeNode(userObject)
+      private enum class ClickedNodeStyle { LEFT, RIGHT }
+
+      private var _clickedNode: Pair<MustacheTreeNode?, ClickedNodeStyle> = Pair.empty() // higher priority than _selectedNodeName
+
       private fun interface Visitor {
         fun visit(node: MustacheTreeNode)
       }
@@ -176,7 +214,6 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       }
     }
 
-    private class MustacheTreeNode(userObject: Any) : DefaultMutableTreeNode(userObject)
 
     override fun dispose() {
       messageBusConnection.disconnect()

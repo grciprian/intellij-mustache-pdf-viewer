@@ -251,8 +251,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       // reprocess include dependency tree for mustache files under the new templates folder
       _mustacheIncludeProcessor.processFileIncludePropsMap()
       _mustacheIncludeProcessor.invalidateRootPdfs()
-//      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs()
-//      project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
 
       // we save the selected editor's file for it to be reselected after editors switch
       val selectedEditorFile = fileEditorManager.selectedEditor?.file
