@@ -1,7 +1,6 @@
 package generate;
 
 import com.samskivert.mustache.Template;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.lang.reflect.Field;
@@ -121,6 +120,7 @@ public class PdfStructureService {
     private final List<Structure> structures;
     // only has meaning if SEG_TYPE is INCLUDED_TEMPLATE_SEGMENT
     private final boolean isIncludedTemplateSegmentValid;
+    private String customToString;
 
     public Structure(String parentFragment, String name, int line, SEG_TYPE segType, List<Structure> structures) {
       this.parentFragment = parentFragment;
@@ -139,16 +139,15 @@ public class PdfStructureService {
       return new Structure(null, null, -1, null, null);
     }
 
-    public static Structure createRootStructure(String root, @Nullable String selectedNodeName) {
-      var name = Optional.ofNullable(selectedNodeName).map(v -> v + " @ " + root).orElse(root);
+    public static Structure createRootStructure(String name) {
       return new Structure(name, name, -1, null, null);
     }
 
     @Override
     public String toString() {
-      if (line == -1) return name;
       var segT = Optional.ofNullable(segType).map(SEG_TYPE::getValue).orElse("");
-      return "%s%s, line=%d".formatted(segT, name, line);
+      return Optional.ofNullable(customToString)
+        .orElse("%s%s, line=%d".formatted(segT, name, line));
     }
 
     @Override
@@ -186,6 +185,14 @@ public class PdfStructureService {
 
     public boolean isIncludedTemplateSegmentValid() {
       return isIncludedTemplateSegmentValid;
+    }
+
+    public String getCustomToString() {
+      return customToString;
+    }
+
+    public void setCustomToString(String customToString) {
+      this.customToString = customToString;
     }
   }
 
