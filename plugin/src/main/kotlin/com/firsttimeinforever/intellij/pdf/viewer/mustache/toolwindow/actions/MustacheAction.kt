@@ -16,8 +16,6 @@ abstract class MustacheAction : AnAction(), DumbAware {
   override fun update(e: AnActionEvent) {
     val p = e.presentation
     p.isEnabled = isAvailable(e)
-//    val editor = findEditorInView(e)
-//    println(editor?.file?.canonicalPath)
   }
 
   protected open fun isAvailable(e: AnActionEvent): Boolean {

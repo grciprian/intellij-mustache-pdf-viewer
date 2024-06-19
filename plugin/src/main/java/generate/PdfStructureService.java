@@ -139,8 +139,12 @@ public class PdfStructureService {
       return new Structure(null, null, -1, null, null);
     }
 
-    public static Structure createRootStructure(String name) {
-      return new Structure(name, name, -1, null, null);
+    public static Structure createRoot(String name, List<Structure> structures) {
+      return new Structure(name, name, -1, null, structures);
+    }
+
+    public Boolean isRoot() {
+      return Objects.equals(parentFragment, name) && line == -1 && segType == null; // sufficient, structures may or may not exist under root
     }
 
     @Override

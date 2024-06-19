@@ -63,12 +63,15 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
     private val messageBusConnection = project.messageBus.connect()
     private val mustacheContextService = project.service<MustacheContextService>()
     private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
-    private val actionManager = ActionManager.getInstance()
 
     init {
       Disposer.register(this, messageBusConnection)
-//      _contentPanel.layout = GridLayout(0, 1)
-//      _contentPanel.border = BorderFactory.createEmptyBorder()
+      val actionToolbar = ActionManager.getInstance().createActionToolbar(
+        "Mustache Navigator Toolbar",
+        ActionManager.getInstance().getAction("mustache.tool.NavigatorActionsToolbar") as DefaultActionGroup,
+        true
+      )
+      _contentPanel.toolbar = actionToolbar.component
       messageBusConnection.subscribe(
         MustacheToolWindowListener.TOPIC,
         object : MustacheToolWindowListener {
@@ -83,20 +86,11 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
           }
 
           private fun handleTreeInContentPanel(root: String, selectedNodeName: String?) {
-//            if (_contentPanel.content?.components?.isNotEmpty() == true) _contentPanel.content?.remove(0)
-
             Optional.ofNullable(mustacheIncludeProcessor.getPdfForRoot(root))
               .map(PdfGenerationService.Pdf::structures)
               .map { createTree(root, it, selectedNodeName) }
               .ifPresentOrElse({
-                val actionToolbar = actionManager.createActionToolbar(
-                  "Mustache Navigator Toolbar",
-                  actionManager
-                    .getAction("mustache.tool.NavigatorActionsToolbar") as DefaultActionGroup,
-                  true
-                )
                 actionToolbar.targetComponent = it
-                _contentPanel.toolbar = actionToolbar.component
                 _contentPanel.setContent(ScrollPaneFactory.createScrollPane(it))
               }, {
                 // smth
@@ -106,7 +100,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
     }
 
     private fun createTree(root: String, structures: List<Structure>, selectedNodeName: String?): JTree {
-      val rootStructure = Structure.createRootStructure(root)
+      val rootStructure = Structure.createRoot(root, structures)
       rootStructure.customToString = Optional.ofNullable(selectedNodeName).map { v -> "$v @ $root" }.orElse(root)
       val rootNode = MustacheTreeNode(rootStructure)
       val selectedNodes = mutableListOf<MustacheTreeNode>()
@@ -120,7 +114,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         }
       }
 
-      buildTreeNodesFromStructures(rootNode, structures, visitor)
+      buildTreeNodesFromStructures(rootNode, visitor)
       val tree = Tree(DefaultTreeModel(rootNode))
       tree.addMouseListener(TreeMouseListener(project) {
         _clickedNode = it
@@ -162,13 +156,13 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         if (nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT && nodeStructure.isIncludedTemplateSegmentValid) {
           navigateToFile(nodeStructure.name(), 0)
         } else {
-          navigateToFile(nodeStructure.parentFragment(), nodeStructure.line(), !isRootNodeStructure(nodeStructure))
+          navigateToFile(nodeStructure.parentFragment(), nodeStructure.line(), !nodeStructure.isRoot)
         }
       }
 
       private fun handleRightClick(node: MustacheTreeNode) {
         val nodeStructure = node.userObject as Structure
-        navigateToFile(nodeStructure.parentFragment(), nodeStructure.line(), !isRootNodeStructure(nodeStructure))
+        navigateToFile(nodeStructure.parentFragment(), nodeStructure.line(), !nodeStructure.isRoot)
       }
 
       private fun navigateToFile(mustacheRelativePath: String, line: Int, selectLine: Boolean = false) {
@@ -214,13 +208,14 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         fun visit(node: MustacheTreeNode)
       }
 
-      private fun buildTreeNodesFromStructures(node: MustacheTreeNode, structures: List<Structure>, @Nullable visitor: Visitor?) {
-        for (structure in structures) {
+      private fun buildTreeNodesFromStructures(node: MustacheTreeNode, @Nullable visitor: Visitor?) {
+        val nodeStructures = (node.userObject as Structure).structures()
+        for (structure in nodeStructures) {
           val newNode = MustacheTreeNode(structure)
           visitor?.visit(newNode)
           val insideStructures = structure.structures()
           if (insideStructures != null) {
-            buildTreeNodesFromStructures(newNode, insideStructures, visitor)
+            buildTreeNodesFromStructures(newNode, visitor)
           }
           node.add(newNode)
         }
@@ -245,10 +240,6 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         }
         tree.selectionPaths = nodesCopy.map { TreePath(it.path) }.toTypedArray()
         tree.scrollPathToVisible(tree.selectionPaths?.get(0))
-      }
-
-      private fun isRootNodeStructure(nodeStructure: Structure): Boolean {
-        return nodeStructure.line() == -1
       }
     }
 

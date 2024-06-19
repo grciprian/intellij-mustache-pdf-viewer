@@ -6,7 +6,7 @@
     <!--Mustache actions-->
     <action id="mustache.tool.TargetSelectedTemplateInTreeAction"
             class="com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.actions.TargetSelectedTemplateInTreeAction"
-            icon="AllIcons.Nodes.Target"/>
+            icon="AllIcons.Actions.ShowCode"/>
 
     <!--Common actions-->
     <action id="pdf.viewer.ReloadViewAction"
