@@ -5,18 +5,21 @@ import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheTo
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.TEMPLATES_PATH
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
-import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
 import com.jgoodies.common.base.Objects
@@ -25,12 +28,10 @@ import generate.PdfStructureService.SEG_TYPE
 import generate.PdfStructureService.Structure
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.annotations.Nullable
-import java.awt.GridLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.nio.file.Path
 import java.util.*
-import javax.swing.BorderFactory
 import javax.swing.JPanel
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
@@ -55,18 +56,19 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
   }
 
   private class MustacheToolWindowContent(private val project: Project, toolWindow: ToolWindow) : Disposable {
-    private val _contentPanel = JPanel()
+    private val _contentPanel = SimpleToolWindowPanel(true, true)
     private lateinit var _root: String
     private var _selectedNodeName: String? = null
     private var _clickedNode: Pair<MustacheTreeNode, ClickedNodeStyle> = Pair.empty() // higher priority than _selectedNodeName
     private val messageBusConnection = project.messageBus.connect()
     private val mustacheContextService = project.service<MustacheContextService>()
     private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
+    private val actionManager = ActionManager.getInstance()
 
     init {
       Disposer.register(this, messageBusConnection)
-      _contentPanel.layout = GridLayout(0, 1)
-      _contentPanel.border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+//      _contentPanel.layout = GridLayout(0, 1)
+//      _contentPanel.border = BorderFactory.createEmptyBorder()
       messageBusConnection.subscribe(
         MustacheToolWindowListener.TOPIC,
         object : MustacheToolWindowListener {
@@ -81,15 +83,21 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
           }
 
           private fun handleTreeInContentPanel(root: String, selectedNodeName: String?) {
-            if (_contentPanel.components.isNotEmpty()) _contentPanel.remove(0)
+//            if (_contentPanel.content?.components?.isNotEmpty() == true) _contentPanel.content?.remove(0)
+
             Optional.ofNullable(mustacheIncludeProcessor.getPdfForRoot(root))
               .map(PdfGenerationService.Pdf::structures)
-              .map {
-                createTree(root, it, selectedNodeName)
-              }
+              .map { createTree(root, it, selectedNodeName) }
               .ifPresentOrElse({
-                _contentPanel.add(it)
-                _contentPanel.repaint()
+                val actionToolbar = actionManager.createActionToolbar(
+                  "Mustache Navigator Toolbar",
+                  actionManager
+                    .getAction("mustache.tool.NavigatorActionsToolbar") as DefaultActionGroup,
+                  true
+                )
+                actionToolbar.targetComponent = it
+                _contentPanel.toolbar = actionToolbar.component
+                _contentPanel.setContent(ScrollPaneFactory.createScrollPane(it))
               }, {
                 // smth
               })
@@ -97,7 +105,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         })
     }
 
-    private fun createTree(root: String, structures: List<Structure>, selectedNodeName: String?): JBScrollPane {
+    private fun createTree(root: String, structures: List<Structure>, selectedNodeName: String?): JTree {
       val rootStructure = Structure.createRootStructure(root)
       rootStructure.customToString = Optional.ofNullable(selectedNodeName).map { v -> "$v @ $root" }.orElse(root)
       val rootNode = MustacheTreeNode(rootStructure)
@@ -122,9 +130,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       handleClickedNode(tree, selectedNodes)
       _clickedNode = Pair.empty()
 
-      val scrollTree = JBScrollPane(tree)
-      scrollTree.border = BorderFactory.createEmptyBorder()
-      return scrollTree
+      return tree
     }
 
     private class TreeMouseListener(val project: Project, val updateClickedNode: ClickedNodeUpdater) : MouseAdapter() {
@@ -198,7 +204,6 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
     companion object {
 
-      private class MustacheTreeNode(userObject: Any) : DefaultMutableTreeNode(userObject)
       private enum class ClickedNodeStyle { LEFT, RIGHT }
 
       private fun interface ClickedNodeUpdater {
@@ -219,6 +224,16 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
           }
           node.add(newNode)
         }
+      }
+
+      fun visitTreeNodes(tree: Tree, visitor: Visitor) {
+        fun visit(node: MustacheTreeNode) {
+          visitor.visit(node)
+          for (child in node.children()) {
+            visit(node)
+          }
+        }
+        visit(tree.model.root as MustacheTreeNode)
       }
 
       private fun expandToPaths(tree: Tree, nodes: List<MustacheTreeNode>) {
@@ -245,6 +260,8 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
   }
 
   companion object {
-    const val NAME = "Mustache Tool"
+    const val NAME = "Mustache"
   }
 }
+
+class MustacheTreeNode(userObject: Any) : DefaultMutableTreeNode(userObject)

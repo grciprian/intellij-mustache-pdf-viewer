@@ -3,6 +3,11 @@
     <action id="pdf.viewer.OpenDevtoolsAction"
             class="com.firsttimeinforever.intellij.pdf.viewer.actions.debug.PdfOpenDevtoolsAction"/>
 
+    <!--Mustache actions-->
+    <action id="mustache.tool.TargetSelectedTemplateInTreeAction"
+            class="com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.actions.TargetSelectedTemplateInTreeAction"
+            icon="AllIcons.Nodes.Target"/>
+
     <!--Common actions-->
     <action id="pdf.viewer.ReloadViewAction"
             class="com.firsttimeinforever.intellij.pdf.viewer.actions.view.PdfReloadViewAction"
@@ -110,6 +115,13 @@
             icon="AllIcons.Actions.Forward"/>
 
     <!--Actions list action-->
+
+    <!--Mustache toolbar actions-->
+    <group id="mustache.tool.NavigatorActionsToolbar">
+      <reference id="mustache.tool.TargetSelectedTemplateInTreeAction"/>
+      <separator/>
+    </group>
+
     <action id="pdf.viewer.ActionList"
             class="com.firsttimeinforever.intellij.pdf.viewer.actions.PdfActionList"/>
 
