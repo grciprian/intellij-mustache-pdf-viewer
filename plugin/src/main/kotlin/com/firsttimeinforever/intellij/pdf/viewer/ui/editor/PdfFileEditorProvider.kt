@@ -14,6 +14,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import generate.Utils.getTemplatesPath
 
+
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
   private val mainProvider: TextEditorProvider = TextEditorProvider.getInstance()
@@ -25,10 +26,11 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   override fun accept(project: Project, file: VirtualFile): Boolean {
     if (file.fileType == PdfFileType) return true
     return try {
+      if (!(mainProvider.accept(project, file) && file.extension == instance.customMustacheSuffix)) return false
       MUSTACHE_PREFIX = instance.customMustachePrefix
       MUSTACHE_SUFFIX = instance.customMustacheSuffix
       TEMPLATES_PATH = getTemplatesPath(project, file.canonicalPath)
-      mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX
+      true
     } catch (e: Exception) {
       // log maybe? or not
       false
@@ -49,7 +51,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
           return pdfFileEditor as PdfFileEditor
         } else if (mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX) {
           mustacheFileEditor = MustacheFileEditor(project, file)
-          return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview
+          return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview().build()
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
       }

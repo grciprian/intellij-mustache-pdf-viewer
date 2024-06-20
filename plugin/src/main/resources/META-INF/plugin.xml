@@ -1,8 +1,8 @@
 <idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude" require-restart="false">
-  <id>com.firsttimeinforever.intellij.pdf.viewer.intellij-pdf-viewer</id>
-  <name>PDF Viewer</name>
-  <vendor email="ivmposti+pdf-viewer@gmail.com" url="https://github.com/FirstTimeInForever/intellij-pdf-viewer">
-    FirstTimeInForever
+  <id>pdf-viewer-mustache-enhanced</id>
+  <name>PDF Viewer Mustache Enhanced</name>
+  <vendor email="ghenceanu.ciprian@gmail.com" url="https://github.com/FirstTimeInForever/intellij-pdf-viewer">
+    Ciprian Ghenceanu
   </vendor>
 
   <depends>com.intellij.modules.platform</depends>

@@ -1,6 +1,8 @@
 package generate;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -24,18 +26,21 @@ public class Utils {
   // TODO maybe rethink this?
   public static String getTemplatesPath(Project project, String canonicalFilePath) {
     // maybe this is not the way. maybe another kind of path should be used for system specific
-    var projectPath = project.getBasePath();
-    Objects.requireNonNull(projectPath, "Could not getFileResourcesPathWithPrefix because path of project is null!");
+    var module = ProjectRootManager.getInstance(project).getFileIndex().getModuleForFile(VfsUtil.findFile(Path.of(canonicalFilePath), true));
+    var modelContentRoots = ModuleRootManager.getInstance(module).getContentRoots();
+    if (modelContentRoots.length == 0) throw new RuntimeException("File is not in the resources folder of the java project!");
+    var moduleCanonicalPath = modelContentRoots[0].getCanonicalPath();
+    Objects.requireNonNull(moduleCanonicalPath, "Could not getFileResourcesPathWithPrefix because path of project is null!");
     Objects.requireNonNull(canonicalFilePath, "Could not getFileResourcesPathWithPrefix because path of virtualFile is null!");
-    var javaResourcesWithMustachePrefix = "/resources/" + MUSTACHE_PREFIX + "/";
-    var resourcesIndex = canonicalFilePath.indexOf(javaResourcesWithMustachePrefix, projectPath.length());
+    var javaResourcesWithMustachePrefix = "src/main/resources/" + MUSTACHE_PREFIX + "/";
+    var resourcesIndex = canonicalFilePath.indexOf(javaResourcesWithMustachePrefix, moduleCanonicalPath.length());
     if (resourcesIndex != -1) return canonicalFilePath.substring(0, resourcesIndex + javaResourcesWithMustachePrefix.length());
     throw new RuntimeException("File is not in the resources folder of the java project!");
   }
 
   public static boolean isFilePathUnderTemplatesPath(Project project, String canonicalFilePath) {
     try {
-      if(canonicalFilePath == null) return false;
+      if (canonicalFilePath == null) return false;
       getTemplatesPath(project, canonicalFilePath);
       return true;
     } catch (Exception e) {

@@ -20,20 +20,12 @@ class MustacheFileEditor(
 ) : Disposable {
   private val provider = TextEditorProvider.getInstance()
   private val messageBusConnection = project.messageBus.connect()
-  private val editor = createEditorBuilder().build() as TextEditor
-  private val preview = MustachePdfFileEditorWrapper(project, virtualFile)
-  private val _textEditorWithPreview = TextEditorWithPreview(
-    editor, preview, NAME, TextEditorWithPreview.Layout.SHOW_EDITOR_AND_PREVIEW, !PdfViewerSettings.instance.isVerticalSplit
-  )
+  private lateinit var editor: TextEditor
+  private lateinit var preview: MustachePdfFileEditorWrapper
+  private lateinit var _textEditorWithPreview: TextEditorWithPreview
 
   init {
-//    Disposer.register(this, textEditorWithPreview)
-    Disposer.register(_textEditorWithPreview, messageBusConnection)
-    Disposer.register(_textEditorWithPreview, editor)
-    Disposer.register(_textEditorWithPreview, preview)
-    messageBusConnection.subscribe(PdfViewerSettings.TOPIC_SETTINGS, PdfViewerSettingsListener {
-      _textEditorWithPreview.isVerticalSplit = !it.isVerticalSplit
-    })
+
   }
 
   private fun createEditorBuilder(): AsyncFileEditorProvider.Builder {
@@ -49,8 +41,26 @@ class MustacheFileEditor(
     }
   }
 
-  val textEditorWithPreview: TextEditorWithPreview
-    get() = _textEditorWithPreview
+  val textEditorWithPreview: () -> AsyncFileEditorProvider.Builder
+    get() = {
+      object : AsyncFileEditorProvider.Builder() {
+        override fun build(): FileEditor {
+          editor = createEditorBuilder().build() as TextEditor
+          preview = MustachePdfFileEditorWrapper(project, virtualFile)
+          _textEditorWithPreview = TextEditorWithPreview(
+            editor, preview, NAME, TextEditorWithPreview.Layout.SHOW_EDITOR_AND_PREVIEW, !PdfViewerSettings.instance.isVerticalSplit
+          )
+          //    Disposer.register(this, textEditorWithPreview)
+          Disposer.register(_textEditorWithPreview, messageBusConnection)
+          Disposer.register(_textEditorWithPreview, editor)
+          Disposer.register(_textEditorWithPreview, preview)
+          messageBusConnection.subscribe(PdfViewerSettings.TOPIC_SETTINGS, PdfViewerSettingsListener {
+            _textEditorWithPreview.isVerticalSplit = !it.isVerticalSplit
+          })
+          return _textEditorWithPreview
+        }
+      }
+    }
 
   companion object {
     const val NAME = "Mustache Viewer File Editor With Preview"

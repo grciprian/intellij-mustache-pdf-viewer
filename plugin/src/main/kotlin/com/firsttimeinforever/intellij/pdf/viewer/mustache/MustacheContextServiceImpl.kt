@@ -56,7 +56,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileEditorManagerListener)
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FONTS_PATH, PdfViewerMustacheFontsPathSettingsListener {
       val syncedTabbedRootNamesFromAllValidEditors =
-        fileEditorManager.allEditors.filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
+        fileEditorManager.allEditors.asSequence().filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
           .map { ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).syncedTabbedEditors }.flatten()
           .map { it.rootName }.toSet()
       _mustacheIncludeProcessor.invalidateRootPdfsForMustacheRoots(syncedTabbedRootNamesFromAllValidEditors)

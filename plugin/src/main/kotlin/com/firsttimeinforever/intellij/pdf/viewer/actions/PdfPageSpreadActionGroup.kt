@@ -4,7 +4,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 
 class PdfPageSpreadActionGroup : DefaultActionGroup() {
-  override fun isPopup(): Boolean = true
+  // TODO: investigate why isPopup should not be overridden
+//  override fun isPopup(): Boolean = true
 
   override fun update(event: AnActionEvent) {
     event.presentation.isVisible = PdfAction.hasEditorInView(event)

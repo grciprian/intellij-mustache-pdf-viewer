@@ -1,4 +1,4 @@
-rootProject.name = "intellij-pdf-viewer"
+rootProject.name = "intellij-pdf-viewer-mustache-enhanced"
 
 include(":web-view")
 include(":web-view:viewer")
