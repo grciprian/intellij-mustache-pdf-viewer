@@ -7,7 +7,6 @@ import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFont
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_PREFIX
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.TEMPLATES_PATH
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustachePdfFileEditorWrapper
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheRefreshPdfFileEditorTabs
@@ -15,9 +14,8 @@ import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheUpd
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.fileEditor.*
-import com.intellij.openapi.project.Project
+import com.intellij.openapi.module.Module
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.io.toCanonicalPath
 import com.intellij.openapi.vfs.VfsUtil
@@ -34,10 +32,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 
-@Service(Service.Level.PROJECT)
-class MustacheContextServiceImpl(private val project: Project) : MustacheContextService, Disposable {
+class MustacheContextServiceImpl(private val module: Module) : MustacheContextService, Disposable {
 
-  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(project)
+  private val project = module.project
+  private var _templatesPath = getTemplatesPath(module)
+  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(module)
   private val fileEditorManager = FileEditorManager.getInstance(project)
   private val settings = PdfViewerSettings.instance
   private val fileChangedListener = FileChangedListener()
@@ -48,7 +47,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
   init {
     Disposer.register(this, messageBusConnection)
-    println("MustacheContextServiceImpl initialized for " + project.name)
+    println("MustacheContextServiceImpl initialized for " + module.name)
 
     messageBusConnection.subscribe(AppLifecycleListener.TOPIC, appLifecycleListener)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
@@ -63,6 +62,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       syncedTabbedRootNamesFromAllValidEditors.forEach { _mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
       project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(syncedTabbedRootNamesFromAllValidEditors)
     })
+
   }
 
   private inner class MyAppLifecycleListener : AppLifecycleListener {
@@ -86,7 +86,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         settings.customMustacheFontsPath, events
       ) { _, _ -> settings.notifyMustacheFontsPathSettingsListeners() }
       watchPath(
-        TEMPLATES_PATH, events
+        _templatesPath, events
       ) { file, event ->
         println("Target file ${file?.canonicalPath} changed. Reloading current view.")
         file ?: return@watchPath
@@ -211,8 +211,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           toolWindow?.show()
         }
         root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot ?: return
-        val selectedNodeName = getRelativeMustacheFilePathFromTemplatesPath(project, selectedEditor.file?.canonicalPath)
-        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).rootChanged(root, selectedNodeName)
+        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).rootChanged(root, selectedEditor.file!!)
       }
       if (root == null && toolWindowInitialized) {
         toolWindowInitialized = false
@@ -227,12 +226,12 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     override fun filePropsChanged(settings: PdfViewerSettings) {
       // get editors for all files under old templates folder and under the new templates folder
       val beforeModMustacheEditorsFiles =
-        fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(project, it.file.canonicalPath) }.map { it.file }
+        fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(it.file.canonicalPath, _templatesPath) }.map { it.file }
           .toImmutableSet()
       MUSTACHE_PREFIX = PdfViewerSettings.instance.customMustachePrefix
       MUSTACHE_SUFFIX = PdfViewerSettings.instance.customMustacheSuffix
       val afterModMustacheEditorsFiles =
-        fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(project, it.file.canonicalPath) }.map { it.file }
+        fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(it.file.canonicalPath, _templatesPath) }.map { it.file }
           .toImmutableSet()
       val mustacheEditorsFiles = beforeModMustacheEditorsFiles.plus(afterModMustacheEditorsFiles)
 
@@ -242,10 +241,10 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       // if we now have an editor open for the new templates folder then we can recalculate TEMPLATES_PATH for specialized mustache editors to open
       Optional.ofNullable(afterModMustacheEditorsFiles.firstOrNull())
         .ifPresentOrElse(
-          { TEMPLATES_PATH = getTemplatesPath(project, it.canonicalPath) },
+          { _templatesPath = getTemplatesPath(module) },
           {
             println("FilePropsChanged: Not editor open so the TEMPLATES_PATH haven't have to be modified right now. It would be updated on the next valid opened mustache.")
-            TEMPLATES_PATH = null.toString()
+            _templatesPath = null.toString()
           })
 
       // reprocess include dependency tree for mustache files under the new templates folder
@@ -271,6 +270,9 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   override fun getMustacheIncludeProcessor(): MustacheIncludeProcessor {
     return _mustacheIncludeProcessor
   }
+
+  public val templatesPath: String
+    get() = _templatesPath
 
   override fun dispose() {
     messageBusConnection.disconnect()

@@ -1,8 +1,8 @@
 package generate;
 
+import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
-import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -13,7 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.*;
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_PREFIX;
+import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_SUFFIX;
 import static java.util.Collections.EMPTY_MAP;
 
 public class Utils {
@@ -24,38 +25,31 @@ public class Utils {
   }
 
   // TODO maybe rethink this?
-  public static String getTemplatesPath(Project project, String canonicalFilePath) {
+  public static String getTemplatesPath(Module module) {
     // maybe this is not the way. maybe another kind of path should be used for system specific
-    var module = ProjectRootManager.getInstance(project).getFileIndex().getModuleForFile(VfsUtil.findFile(Path.of(canonicalFilePath), true));
-    var modelContentRoots = ModuleRootManager.getInstance(module).getContentRoots();
-    if (modelContentRoots.length == 0) throw new RuntimeException("File is not in the resources folder of the java project!");
-    var moduleCanonicalPath = modelContentRoots[0].getCanonicalPath();
-    Objects.requireNonNull(moduleCanonicalPath, "Could not getFileResourcesPathWithPrefix because path of project is null!");
-    Objects.requireNonNull(canonicalFilePath, "Could not getFileResourcesPathWithPrefix because path of virtualFile is null!");
-    var javaResourcesWithMustachePrefix = "src/main/resources/" + MUSTACHE_PREFIX + "/";
-    var resourcesIndex = canonicalFilePath.indexOf(javaResourcesWithMustachePrefix, moduleCanonicalPath.length());
-    if (resourcesIndex != -1) return canonicalFilePath.substring(0, resourcesIndex + javaResourcesWithMustachePrefix.length());
-    throw new RuntimeException("File is not in the resources folder of the java project!");
-  }
-
-  public static boolean isFilePathUnderTemplatesPath(Project project, String canonicalFilePath) {
+//    var module = ProjectRootManager.getInstance(project).getFileIndex().getModuleForFile(VfsUtil.findFile(Path.of(canonicalFilePath), true));
+    var moduleContentRoots = ModuleRootManager.getInstance(module).getContentRoots();
+    if (moduleContentRoots.length == 0) throw new RuntimeException("Could not get root module!");
+    var moduleCanonicalPath = moduleContentRoots[0].getCanonicalPath();
+    Objects.requireNonNull(moduleCanonicalPath, "moduleCanonicalPath must not be null");
+    var moduleTemplatesPath = Path.of(moduleCanonicalPath, "/src/main/resources/" + MUSTACHE_PREFIX + "/");
     try {
-      if (canonicalFilePath == null) return false;
-      getTemplatesPath(project, canonicalFilePath);
-      return true;
-    } catch (Exception e) {
-      return false;
+      return moduleTemplatesPath.toFile().getCanonicalPath();
+    } catch (IOException e) {
+      throw new RuntimeException("Templates folder does not exist!");
     }
   }
 
-  public static String getRelativeMustacheFilePathFromTemplatesPath(Project project, String canonicalFilePath) {
-    if (!isFilePathUnderTemplatesPath(project, canonicalFilePath)) return null;
-    Objects.requireNonNull(canonicalFilePath, "Could not getRelativePathFromResourcePathWithPrefix because canonicalPath of virtualFile is null!");
-    var extensionPointIndex = StringUtilRt.lastIndexOf(canonicalFilePath, '.', 0, canonicalFilePath.length());
+  public static boolean isFilePathUnderTemplatesPath(String fileCanonicalPath, String templatesCanonicalPath) {
+    return fileCanonicalPath.startsWith(templatesCanonicalPath);
+  }
+
+  public static String getRelativeMustacheFilePathFromTemplatesPath(String fileCanonicalPath, String templatesCanonicalPath) {
+    var extensionPointIndex = StringUtilRt.lastIndexOf(fileCanonicalPath, '.', 0, fileCanonicalPath.length());
     if (extensionPointIndex < 0) return null;
-    var extension = canonicalFilePath.subSequence(extensionPointIndex + 1, canonicalFilePath.length());
+    var extension = fileCanonicalPath.subSequence(extensionPointIndex + 1, fileCanonicalPath.length());
     if (!MUSTACHE_SUFFIX.contentEquals(extension)) return null;
-    return canonicalFilePath.substring(TEMPLATES_PATH.length(), extensionPointIndex);
+    return fileCanonicalPath.substring(templatesCanonicalPath.length(), extensionPointIndex);
   }
 
   public static Pdf getPdf(Project project, String filename) {

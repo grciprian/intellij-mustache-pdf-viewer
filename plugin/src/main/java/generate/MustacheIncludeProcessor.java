@@ -1,7 +1,7 @@
 package generate;
 
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.project.Project;
+import com.intellij.openapi.module.Module;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import generate.PdfGenerationService.Pdf;
@@ -20,20 +20,20 @@ public class MustacheIncludeProcessor {
 
   private static final Logger logger = Logger.getInstance(MustacheIncludeProcessor.class);
   private static MustacheIncludeProcessor instance;
-  private final Project project;
+  private final Module module;
   private final Map<String, PdfFileExpirationWrapper> rootPdfFileMap = new HashMap<>();
   private final Map<String, MustacheIncludeProcessor.IncludeProps> oldIncludePropsMap = new HashMap<>();
   private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
 
-  private MustacheIncludeProcessor(Project project) {
+  private MustacheIncludeProcessor(Module module) {
     Objects.requireNonNull(TEMPLATES_PATH, "FILE_RESOURCES_PATH_WITH_PREFIX must not be null!");
-    this.project = project;
+    this.module = module;
     processFileIncludePropsMap();
   }
 
-  public static MustacheIncludeProcessor getInstance(Project project) {
+  public static MustacheIncludeProcessor getInstance(Module module) {
     if (MustacheIncludeProcessor.instance != null) return MustacheIncludeProcessor.instance;
-    MustacheIncludeProcessor.instance = new MustacheIncludeProcessor(project);
+    MustacheIncludeProcessor.instance = new MustacheIncludeProcessor(module);
     return MustacheIncludeProcessor.instance;
   }
 
@@ -48,7 +48,7 @@ public class MustacheIncludeProcessor {
       if (mustacheFile.isDirectory()) {
         return true;
       }
-      var relativePath = getRelativeMustacheFilePathFromTemplatesPath(project, mustacheFile.getCanonicalPath());
+      var relativePath = getRelativeMustacheFilePathFromTemplatesPath(module, mustacheFile.getCanonicalPath());
       if (relativePath == null) {
         return true;
       }
@@ -103,7 +103,7 @@ public class MustacheIncludeProcessor {
   }
 
   public Set<String> getOldRootsForMustache(String canonicalFilePath) {
-    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(project, canonicalFilePath);
+    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(module, canonicalFilePath);
     return oldIncludePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
@@ -112,7 +112,7 @@ public class MustacheIncludeProcessor {
   }
 
   public Set<String> getRootsForMustache(String canonicalFilePath) {
-    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(project, canonicalFilePath);
+    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(module, canonicalFilePath);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
@@ -138,7 +138,7 @@ public class MustacheIncludeProcessor {
 
   public VirtualFile processPdfFileForMustacheRoot(String root) {
     if (rootPdfFileMap.get(root) == null || rootPdfFileMap.get(root).expired) {
-      var pdf = getPdf(project, root);
+      var pdf = getPdf(module, root);
       rootPdfFileMap.put(root, new PdfFileExpirationWrapper(pdf));
     }
     return rootPdfFileMap.get(root).pdf.file();

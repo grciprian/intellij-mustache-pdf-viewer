@@ -14,7 +14,6 @@
               language="PDF"
               fieldName="INSTANCE"
               implementationClass="com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType"/>
-    <projectService serviceInterface="com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService" serviceImplementation="com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl"/>
     <fileEditorProvider implementation="com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProvider"/>
     <httpRequestHandler implementation="com.firsttimeinforever.intellij.pdf.viewer.jcef.PdfStaticServer"/>
 
@@ -32,6 +31,13 @@
     <toolWindow id="Mustache" anchor="right"
                 factoryClass="com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory"/>
   </extensions>
+
+  <module-components>
+    <component>
+      <interface-class>com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService</interface-class>
+      <implementation-class>com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl</implementation-class>
+    </component>
+  </module-components>
 
   <applicationListeners>
     <listener class="com.firsttimeinforever.intellij.pdf.viewer.ui.widgets.PdfStatusBarProjectManagerListener"

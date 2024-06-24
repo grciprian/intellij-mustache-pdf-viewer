@@ -70,4 +70,3 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
 lateinit var MUSTACHE_PREFIX: String
 lateinit var MUSTACHE_SUFFIX: String
-lateinit var TEMPLATES_PATH: String

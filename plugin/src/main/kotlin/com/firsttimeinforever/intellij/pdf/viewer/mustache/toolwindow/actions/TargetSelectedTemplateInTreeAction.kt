@@ -18,7 +18,7 @@ class TargetSelectedTemplateInTreeAction : MustacheAction() {
     if (lastActiveEditor?.name == MustacheFileEditor.NAME) {
       val tree = e.dataContext.getData(PlatformDataKeys.CONTEXT_COMPONENT) as JTree
       val relativeMustacheFilePath =
-        getRelativeMustacheFilePathFromTemplatesPath(lastActiveEditor.editor.project, lastActiveEditor.editor.virtualFile.canonicalPath)
+        getRelativeMustacheFilePathFromTemplatesPath(lastActiveEditor.editor.virtualFile.canonicalPath, )
       val selectedNodes = mutableListOf<MustacheTreeNode>()
 
       if (tree.rowCount > 0

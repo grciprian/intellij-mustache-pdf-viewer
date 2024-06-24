@@ -1,6 +1,7 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
@@ -9,10 +10,10 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
-import generate.Utils.getRelativeMustacheFilePathFromTemplatesPath
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableSet
 import javax.swing.DefaultSingleSelectionModel
@@ -24,10 +25,11 @@ class MustachePdfFileEditorWrapper(
   private val _jbTabbedPane = JBTabbedPane()
   private val _syncedTabbedEditors = mutableListOf<PdfFileEditor>()
   private val messageBusConnection = project.messageBus.connect()
-  private val mustacheContextService = project.service<MustacheContextService>()
+  private val mustacheContextService = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(mustacheFile)
+    ?.service<MustacheContextService>() as MustacheContextServiceImpl
   private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
-  // orice fisier mustache deschis are asociat un PdfFileEditorWrapper cu un TabbedPane
 
+  // orice fisier mustache deschis are asociat un PdfFileEditorWrapper cu un TabbedPane
   init {
     Disposer.register(this, messageBusConnection)
     mustacheIncludeProcessor.getRootsForMustache(mustacheFile.canonicalPath).forEach { addPdfFileEditorTab(it) }
@@ -40,9 +42,8 @@ class MustachePdfFileEditorWrapper(
       if (source !is DefaultSingleSelectionModel) return@addChangeListener
       if (_jbTabbedPane.selectedIndex < 0 || _jbTabbedPane.selectedIndex >= _syncedTabbedEditors.size) return@addChangeListener
       val root = _syncedTabbedEditors[source.selectedIndex].rootName
-      val selectedNodeName = getRelativeMustacheFilePathFromTemplatesPath(project, mustacheFile.canonicalPath)
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-        .rootChanged(root, selectedNodeName)
+        .rootChanged(root, mustacheFile)
     }
   }
 
