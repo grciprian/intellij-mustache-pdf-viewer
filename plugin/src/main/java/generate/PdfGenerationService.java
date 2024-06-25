@@ -2,7 +2,6 @@ package generate;
 
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
@@ -14,15 +13,10 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities;
 
 import java.awt.*;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
-
-import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
-import static generate.Utils.getRelativeMustacheFilePathFromTemplatesPath;
 
 public class PdfGenerationService {
 
@@ -35,14 +29,18 @@ public class PdfGenerationService {
     """;
   private static PdfGenerationService instance;
   private final Mustache.Compiler mustacheCompiler;
+  private final String templatesPath;
+  private final String mustacheSuffix;
 
-  private PdfGenerationService() {
-    this.mustacheCompiler = CustomMustacheCompiler.getInstance();
+  private PdfGenerationService(String templatesPath, String mustacheSuffix) {
+    this.templatesPath = templatesPath;
+    this.mustacheSuffix = mustacheSuffix;
+    this.mustacheCompiler = CustomMustacheCompiler.getInstance(templatesPath, mustacheSuffix);
   }
 
-  public static PdfGenerationService getInstance() {
+  public static PdfGenerationService getInstance(String templatesPath, String mustacheSuffix) {
     if (instance != null) return instance;
-    instance = new PdfGenerationService();
+    instance = new PdfGenerationService(templatesPath, mustacheSuffix);
     return instance;
   }
 
@@ -81,18 +79,15 @@ public class PdfGenerationService {
     }
   }
 
-  public PdfContent generatePdf(Project project, Object model, VirtualFile mustacheFile) {
+  public PdfContent generatePdf(Object model, String relativeFilePath) {
     try (var outputStream = new ByteArrayOutputStream()) {
-      var relativePath = getRelativeMustacheFilePathFromTemplatesPath(project, mustacheFile.getCanonicalPath());
-      var templateContent = loadText(mustacheFile);
-      var template = mustacheCompiler.compile(templateContent);
+      var canonicalFilePath = Path.of("%s%s.%s".formatted(templatesPath, relativeFilePath, mustacheSuffix)).toFile().getCanonicalPath();
+      var template = mustacheCompiler.compile(new FileReader(canonicalFilePath));
       var html = template.execute(model);
       writePdfContentToStream(outputStream, html);
       var pdf = outputStream.toByteArray();
-      if (pdf.length == 0) {
-        throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
-      }
-      var structure = PdfStructureService.getStructure(relativePath, template);
+      if (pdf.length == 0) throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
+      var structure = PdfStructureService.getStructure(relativeFilePath, template, templatesPath, mustacheSuffix);
       return new PdfContent(outputStream.toByteArray(), structure);
     } catch (Exception e) {
       try (var os = new ByteArrayOutputStream()) {

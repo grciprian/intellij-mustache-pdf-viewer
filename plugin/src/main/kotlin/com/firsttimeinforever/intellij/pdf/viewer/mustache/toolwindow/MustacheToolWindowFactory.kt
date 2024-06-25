@@ -3,7 +3,6 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory.MustacheToolWindowContent.Companion.Visitor
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
@@ -60,8 +59,9 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
   private class MustacheToolWindowContent(private val project: Project, toolWindow: ToolWindow) : Disposable {
     private val _contentPanel = SimpleToolWindowPanel(true, true)
-    private lateinit var _templatesPath: String
     private lateinit var _root: String
+    private lateinit var _templatesPath: String
+    private lateinit var _mustacheSuffix: String
     private lateinit var _selectedNodeName: String
     private var _clickedNode: Pair<MustacheTreeNode, ClickedNodeStyle> = Pair.empty() // higher priority than _selectedNodeName
     private val messageBusConnection = project.messageBus.connect()
@@ -80,10 +80,16 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         MustacheToolWindowListener.TOPIC,
         object : MustacheToolWindowListener {
           override fun rootChanged(root: String, selectedMustache: VirtualFile) {
-            val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(selectedMustache)
-            val templatesPath = (module?.service<MustacheContextServiceImpl>() as MustacheContextServiceImpl).templatesPath
+            val mustacheContextService = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(selectedMustache)
+              ?.service<MustacheContextServiceImpl>() as MustacheContextServiceImpl
             _root = root
-            _selectedNodeName = getRelativeMustacheFilePathFromTemplatesPath(selectedMustache.canonicalPath, templatesPath)
+            _templatesPath = mustacheContextService.templatesPath
+            _mustacheSuffix = mustacheContextService.mustacheSuffix
+            _selectedNodeName = getRelativeMustacheFilePathFromTemplatesPath(
+              selectedMustache.canonicalPath,
+              mustacheContextService.templatesPath,
+              mustacheContextService.mustacheSuffix
+            )
             handleTreeInContentPanel()
           }
 
@@ -122,7 +128,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
       buildTreeNodesFromStructures(rootNode, visitor)
       val tree = Tree(DefaultTreeModel(rootNode))
-      tree.addMouseListener(TreeMouseListener(project, _templatesPath) {
+      tree.addMouseListener(TreeMouseListener(project, _templatesPath, _mustacheSuffix) {
         _clickedNode = it
       })
 
@@ -133,7 +139,13 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       return tree
     }
 
-    private class TreeMouseListener(val project: Project, val templatesPath: String, val updateClickedNode: ClickedNodeUpdater) : MouseAdapter() {
+    private class TreeMouseListener(
+      val project: Project,
+      val templatesPath: String,
+      val mustacheSuffix: String,
+      val updateClickedNode: ClickedNodeUpdater
+    ) :
+      MouseAdapter() {
       override fun mousePressed(e: MouseEvent) {
         handleMouseEvent(e)
       }
@@ -172,7 +184,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       }
 
       private fun navigateToFile(mustacheRelativePath: String, line: Int, selectLine: Boolean = false) {
-        val file = VfsUtil.findFile(Path.of("$templatesPath$mustacheRelativePath.$MUSTACHE_SUFFIX"), true)
+        val file = VfsUtil.findFile(Path.of("$templatesPath$mustacheRelativePath.$mustacheSuffix"), true)
           ?: return
         val ln = line.coerceAtLeast(1) - 1
         val editor =

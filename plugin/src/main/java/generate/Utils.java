@@ -1,7 +1,7 @@
 package generate;
 
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl;
 import com.intellij.openapi.module.Module;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.VfsUtil;
@@ -13,55 +13,49 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_PREFIX;
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_SUFFIX;
 import static java.util.Collections.EMPTY_MAP;
 
 public class Utils {
 
+  public static final String MUSTACHE_TEMPORARY_DIRECTORY = "MTD";
   public static final String MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX = ".mtf.pdf";
 
   private Utils() {
   }
 
   // TODO maybe rethink this?
-  public static String getTemplatesPath(Module module) {
-    // maybe this is not the way. maybe another kind of path should be used for system specific
-//    var module = ProjectRootManager.getInstance(project).getFileIndex().getModuleForFile(VfsUtil.findFile(Path.of(canonicalFilePath), true));
-    var moduleContentRoots = ModuleRootManager.getInstance(module).getContentRoots();
-    if (moduleContentRoots.length == 0) throw new RuntimeException("Could not get root module!");
-    var moduleCanonicalPath = moduleContentRoots[0].getCanonicalPath();
-    Objects.requireNonNull(moduleCanonicalPath, "moduleCanonicalPath must not be null");
-    var moduleTemplatesPath = Path.of(moduleCanonicalPath, "/src/main/resources/" + MUSTACHE_PREFIX + "/");
+  public static String getTemplatesPath(String modulePath, String mustachePrefix) {
+    Objects.requireNonNull(modulePath, "modulePath must not be null");
     try {
-      return moduleTemplatesPath.toFile().getCanonicalPath();
+      return Path.of(modulePath, "/src/main/resources/%s/".formatted(mustachePrefix)).toFile().getCanonicalPath();
     } catch (IOException e) {
-      throw new RuntimeException("Templates folder does not exist!");
+      throw new RuntimeException("Templates folder does not exist");
     }
   }
 
-  public static boolean isFilePathUnderTemplatesPath(String fileCanonicalPath, String templatesCanonicalPath) {
-    return fileCanonicalPath.startsWith(templatesCanonicalPath);
+  public static boolean isFilePathUnderTemplatesPath(String filePath, String templatesPath) {
+    return filePath.startsWith(templatesPath);
   }
 
-  public static String getRelativeMustacheFilePathFromTemplatesPath(String fileCanonicalPath, String templatesCanonicalPath) {
-    var extensionPointIndex = StringUtilRt.lastIndexOf(fileCanonicalPath, '.', 0, fileCanonicalPath.length());
+  public static String getRelativeMustacheFilePathFromTemplatesPath(String filePath, String templatesPath, String mustacheSuffix) {
+    var extensionPointIndex = StringUtilRt.lastIndexOf(filePath, '.', 0, filePath.length());
     if (extensionPointIndex < 0) return null;
-    var extension = fileCanonicalPath.subSequence(extensionPointIndex + 1, fileCanonicalPath.length());
-    if (!MUSTACHE_SUFFIX.contentEquals(extension)) return null;
-    return fileCanonicalPath.substring(templatesCanonicalPath.length(), extensionPointIndex);
+    var extension = filePath.subSequence(extensionPointIndex + 1, filePath.length());
+    if (!mustacheSuffix.contentEquals(extension)) return null;
+    return filePath.substring(templatesPath.length(), extensionPointIndex);
   }
 
-  public static Pdf getPdf(Project project, String filename) {
+  public static Pdf getPdf(String relativeFilePath, String templatesPath, String mustacheSuffix, String moduleName) {
     try {
-      var path = Path.of(TEMPLATES_PATH + filename + "." + MUSTACHE_SUFFIX);
-      var mustacheFile = VfsUtil.findFile(path, true);
-      Objects.requireNonNull(mustacheFile, "mustacheFile for getPdfFile should not be null: " + path);
-      var pdfContent = PdfGenerationService.getInstance().generatePdf(project, EMPTY_MAP, mustacheFile);
-      var outputPath = Path.of(filename.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_') + MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX); // mtf MustacheTemporaryFile
-      if (!Files.exists(outputPath)) Files.createFile(outputPath);
-      Files.write(outputPath, pdfContent.byteArray());
-      return new Pdf(VfsUtil.findFile(outputPath, true), pdfContent.structures());
+      var rootOutputPath = Path.of(MUSTACHE_TEMPORARY_DIRECTORY);
+      if (Files.notExists(rootOutputPath)) Files.createDirectory(rootOutputPath);
+      var moduleOutputPath = Path.of("%s/%s".formatted(MUSTACHE_TEMPORARY_DIRECTORY, moduleName));
+      if (Files.notExists(moduleOutputPath)) Files.createDirectory(moduleOutputPath);
+      var fileOutputPath = Path.of("%s/%s/%s%s".formatted(MUSTACHE_TEMPORARY_DIRECTORY, moduleName, relativeFilePath.replace(VfsUtilCore.VFS_SEPARATOR_CHAR, '_'), MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)); // mtf MustacheTemporaryFile
+      if (Files.notExists(fileOutputPath)) Files.createFile(fileOutputPath);
+      var pdfContent = PdfGenerationService.getInstance(templatesPath, mustacheSuffix).generatePdf(EMPTY_MAP, relativeFilePath);
+      Files.write(fileOutputPath, pdfContent.byteArray());
+      return new Pdf(VfsUtil.findFile(fileOutputPath, true), pdfContent.structures());
     } catch (IOException exception) {
       throw new RuntimeException("Could not process mustache file into PDF file: " + exception.getMessage());
     }

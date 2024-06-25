@@ -5,12 +5,12 @@ import org.junit.Test;
 
 public class PdfContentStructureServiceTest {
 
-  Mustache.Compiler customMustacheCompiler = CustomMustacheCompiler.getInstance();
+  Mustache.Compiler customMustacheCompiler = CustomMustacheCompiler.getInstance("templatesPath", "mustacheSuffix");
 
   @Test
   public void testGetSimpleStructure() {
     var template = customMustacheCompiler.compile("{{#one}}1{{/one}} {{^two}}2{{three}}{{/two}}{{four}}");
-    var structure = PdfStructureService.getStructure("", template);
+    var structure = PdfStructureService.getStructure("", template, "templatesPath", "mustacheSuffix");
     System.out.println(structure);
   }
 
@@ -33,7 +33,7 @@ public class PdfContentStructureServiceTest {
       {{/two}}
       {{four}}
       """);
-    var structure = PdfStructureService.getStructure("", template);
+    var structure = PdfStructureService.getStructure("", template, "templatesPath", "mustacheSuffix");
     System.out.println(structure);
   }
 

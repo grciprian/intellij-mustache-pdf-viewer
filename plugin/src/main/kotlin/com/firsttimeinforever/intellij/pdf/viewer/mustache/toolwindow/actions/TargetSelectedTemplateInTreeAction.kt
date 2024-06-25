@@ -1,10 +1,13 @@
 package com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.actions
 
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheTreeNode
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.PlatformDataKeys
+import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
+import com.intellij.openapi.module.Module
 import generate.PdfStructureService.SEG_TYPE
 import generate.PdfStructureService.Structure
 import generate.Utils.getRelativeMustacheFilePathFromTemplatesPath
@@ -17,19 +20,24 @@ class TargetSelectedTemplateInTreeAction : MustacheAction() {
     val lastActiveEditor = e.dataContext.getData(PlatformDataKeys.LAST_ACTIVE_FILE_EDITOR) as? TextEditorWithPreview
     if (lastActiveEditor?.name == MustacheFileEditor.NAME) {
       val tree = e.dataContext.getData(PlatformDataKeys.CONTEXT_COMPONENT) as JTree
-      val relativeMustacheFilePath =
-        getRelativeMustacheFilePathFromTemplatesPath(lastActiveEditor.editor.virtualFile.canonicalPath, )
+      val mustacheContextService = (e.dataContext.getData(PlatformDataKeys.MODULE) as Module).service<MustacheContextServiceImpl>()
+      val relativeFilePath =
+        getRelativeMustacheFilePathFromTemplatesPath(
+          lastActiveEditor.editor.virtualFile.canonicalPath,
+          mustacheContextService.templatesPath,
+          mustacheContextService.mustacheSuffix
+        )
       val selectedNodes = mutableListOf<MustacheTreeNode>()
 
       if (tree.rowCount > 0
-        && ((tree.getPathForRow(0).lastPathComponent as MustacheTreeNode).userObject as Structure).name() == relativeMustacheFilePath
+        && ((tree.getPathForRow(0).lastPathComponent as MustacheTreeNode).userObject as Structure).name() == relativeFilePath
       ) {
         selectedNodes.add(tree.getPathForRow(0).lastPathComponent as MustacheTreeNode)
       } else {
         for (i in 1 until tree.rowCount) {
           val node = tree.getPathForRow(i).lastPathComponent as MustacheTreeNode
           val nodeStructure = node.userObject as Structure
-          if (nodeStructure.name() == relativeMustacheFilePath && nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT) {
+          if (nodeStructure.name() == relativeFilePath && nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT) {
             selectedNodes.add(node)
           }
         }

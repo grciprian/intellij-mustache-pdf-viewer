@@ -1,15 +1,19 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
 import com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings.Companion.instance
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import generate.Utils.getTemplatesPath
@@ -25,16 +29,9 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
     if (file.fileType == PdfFileType) return true
-    return try {
-      if (!(mainProvider.accept(project, file) && file.extension == instance.customMustacheSuffix)) return false
-      MUSTACHE_PREFIX = instance.customMustachePrefix
-      MUSTACHE_SUFFIX = instance.customMustacheSuffix
-      TEMPLATES_PATH = getTemplatesPath(project, file.canonicalPath)
-      true
-    } catch (e: Exception) {
-      // log maybe? or not
-      false
-    }
+    val mustacheContextService = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
+      ?.service<MustacheContextService>() as MustacheContextServiceImpl
+    return mainProvider.accept(project, file) && file.extension == mustacheContextService.mustacheSuffix
   }
 
   override fun createEditor(project: Project, file: VirtualFile): FileEditor {
@@ -49,7 +46,10 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
         if (file.fileType == PdfFileType) {
           pdfFileEditor = PdfFileEditor(project, file)
           return pdfFileEditor as PdfFileEditor
-        } else if (mainProvider.accept(project, file) && file.extension == MUSTACHE_SUFFIX) {
+        }
+        val mustacheContextService = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
+          ?.service<MustacheContextService>() as MustacheContextServiceImpl
+        if (mainProvider.accept(project, file) && file.extension == mustacheContextService.mustacheSuffix) {
           mustacheFileEditor = MustacheFileEditor(project, file)
           return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview().build()
         }
@@ -67,6 +67,3 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
     private const val PDF = "PDF"
   }
 }
-
-lateinit var MUSTACHE_PREFIX: String
-lateinit var MUSTACHE_SUFFIX: String

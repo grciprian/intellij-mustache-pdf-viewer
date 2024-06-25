@@ -5,8 +5,6 @@ import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheTo
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFilePropsSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFontsPathSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_PREFIX
-import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.MUSTACHE_SUFFIX
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustachePdfFileEditorWrapper
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheRefreshPdfFileEditorTabs
@@ -16,6 +14,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.*
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.io.toCanonicalPath
 import com.intellij.openapi.vfs.VfsUtil
@@ -28,22 +27,28 @@ import generate.MustacheIncludeProcessor
 import generate.Utils.*
 import io.sentry.util.Objects
 import kotlinx.collections.immutable.toImmutableSet
-import java.nio.file.Files
+import org.apache.commons.io.FileUtils
 import java.nio.file.Path
 import java.util.*
 
 class MustacheContextServiceImpl(private val module: Module) : MustacheContextService, Disposable {
 
   private val project = module.project
-  private var _templatesPath = getTemplatesPath(module)
-  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(module)
-  private val fileEditorManager = FileEditorManager.getInstance(project)
   private val settings = PdfViewerSettings.instance
+  private var _mustachePrefix = settings.customMustachePrefix
+  private var _mustacheSuffix = settings.customMustacheSuffix
+  private val modulePath = ModuleRootManager.getInstance(module).contentRoots.firstOrNull()?.canonicalPath
+  private var _templatesPath = getTemplatesPath(modulePath ?: project.basePath, _mustachePrefix)
+  private val fileEditorManager = FileEditorManager.getInstance(project)
   private val fileChangedListener = FileChangedListener()
   private val appLifecycleListener = MyAppLifecycleListener()
-  private val messageBusConnection = project.messageBus.connect()
   private val fileEditorManagerListener = MyFileEditorManagerListener()
   private val mustacheFilePropsListener = MyPdfViewerMustacheFilePropsSettingsListener()
+  private val mustacheFontsPathListener = MyPdfViewerMustacheFontsPathSettingsListener()
+
+  // must be called last
+  private val messageBusConnection = project.messageBus.connect()
+  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(this)
 
   init {
     Disposer.register(this, messageBusConnection)
@@ -52,31 +57,17 @@ class MustacheContextServiceImpl(private val module: Module) : MustacheContextSe
     messageBusConnection.subscribe(AppLifecycleListener.TOPIC, appLifecycleListener)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FILE_PROPS, mustacheFilePropsListener)
+    messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FONTS_PATH, mustacheFontsPathListener)
     messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileEditorManagerListener)
-    messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FONTS_PATH, PdfViewerMustacheFontsPathSettingsListener {
-      val syncedTabbedRootNamesFromAllValidEditors =
-        fileEditorManager.allEditors.asSequence().filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
-          .map { ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).syncedTabbedEditors }.flatten()
-          .map { it.rootName }.toSet()
-      _mustacheIncludeProcessor.invalidateRootPdfsForMustacheRoots(syncedTabbedRootNamesFromAllValidEditors)
-      syncedTabbedRootNamesFromAllValidEditors.forEach { _mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
-      project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(syncedTabbedRootNamesFromAllValidEditors)
-    })
-
   }
 
   private inner class MyAppLifecycleListener : AppLifecycleListener {
     override fun appClosing() {
-      cleanupMtfPdf()
+      cleanupMtdPdf()
     }
 
-    private fun cleanupMtfPdf() {
-      val root = VfsUtil.findFile(Path.of("./"), true) as VirtualFile
-      VfsUtil.processFileRecursivelyWithoutIgnored(root) {
-        if (it.isDirectory) return@processFileRecursivelyWithoutIgnored true
-        if (it.name.endsWith(MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)) Files.deleteIfExists(it.toNioPath())
-        return@processFileRecursivelyWithoutIgnored true
-      }
+    private fun cleanupMtdPdf() {
+      FileUtils.deleteDirectory(Path.of(MUSTACHE_TEMPORARY_DIRECTORY).toFile())
     }
   }
 
@@ -211,7 +202,8 @@ class MustacheContextServiceImpl(private val module: Module) : MustacheContextSe
           toolWindow?.show()
         }
         root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot ?: return
-        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).rootChanged(root, selectedEditor.file!!)
+        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
+          .rootChanged(root, selectedEditor.file!!)
       }
       if (root == null && toolWindowInitialized) {
         toolWindowInitialized = false
@@ -222,14 +214,26 @@ class MustacheContextServiceImpl(private val module: Module) : MustacheContextSe
     }
   }
 
+  private inner class MyPdfViewerMustacheFontsPathSettingsListener : PdfViewerMustacheFontsPathSettingsListener {
+    override fun fontsPathChanged(settings: PdfViewerSettings) {
+      val syncedTabbedRootNamesFromAllValidEditors =
+        fileEditorManager.allEditors.asSequence().filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
+          .map { ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).syncedTabbedEditors }.flatten()
+          .map { it.rootName }.toSet()
+      _mustacheIncludeProcessor.invalidateRootPdfsForMustacheRoots(syncedTabbedRootNamesFromAllValidEditors)
+      syncedTabbedRootNamesFromAllValidEditors.forEach { _mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
+      project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(syncedTabbedRootNamesFromAllValidEditors)
+    }
+  }
+
   private inner class MyPdfViewerMustacheFilePropsSettingsListener : PdfViewerMustacheFilePropsSettingsListener {
     override fun filePropsChanged(settings: PdfViewerSettings) {
       // get editors for all files under old templates folder and under the new templates folder
       val beforeModMustacheEditorsFiles =
         fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(it.file.canonicalPath, _templatesPath) }.map { it.file }
           .toImmutableSet()
-      MUSTACHE_PREFIX = PdfViewerSettings.instance.customMustachePrefix
-      MUSTACHE_SUFFIX = PdfViewerSettings.instance.customMustacheSuffix
+      _mustachePrefix = settings.customMustachePrefix
+      _mustacheSuffix = settings.customMustacheSuffix
       val afterModMustacheEditorsFiles =
         fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(it.file.canonicalPath, _templatesPath) }.map { it.file }
           .toImmutableSet()
@@ -241,7 +245,7 @@ class MustacheContextServiceImpl(private val module: Module) : MustacheContextSe
       // if we now have an editor open for the new templates folder then we can recalculate TEMPLATES_PATH for specialized mustache editors to open
       Optional.ofNullable(afterModMustacheEditorsFiles.firstOrNull())
         .ifPresentOrElse(
-          { _templatesPath = getTemplatesPath(module) },
+          { _templatesPath = getTemplatesPath(modulePath, _mustachePrefix) },
           {
             println("FilePropsChanged: Not editor open so the TEMPLATES_PATH haven't have to be modified right now. It would be updated on the next valid opened mustache.")
             _templatesPath = null.toString()
@@ -271,8 +275,17 @@ class MustacheContextServiceImpl(private val module: Module) : MustacheContextSe
     return _mustacheIncludeProcessor
   }
 
-  public val templatesPath: String
+  val templatesPath: String
     get() = _templatesPath
+
+  val mustachePrefix: String
+    get() = _mustachePrefix
+
+  val mustacheSuffix: String
+    get() = _mustacheSuffix
+
+  val moduleName: String
+    get() = module.name
 
   override fun dispose() {
     messageBusConnection.disconnect()

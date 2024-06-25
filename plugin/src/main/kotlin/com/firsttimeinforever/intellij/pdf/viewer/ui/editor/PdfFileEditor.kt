@@ -24,6 +24,7 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
   val viewComponent = PdfEditorViewComponent(project, pdfFile)
   private val messageBusConnection = project.messageBus.connect()
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
+  //todo fix here!
   private val mustacheContextService = project.service<MustacheContextService>()
   private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
   private var _rootName: String = null.toString()

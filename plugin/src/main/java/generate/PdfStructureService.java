@@ -6,9 +6,6 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.util.*;
 
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_SUFFIX;
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.TEMPLATES_PATH;
-
 public class PdfStructureService {
 
   private static final String SEGS = "_segs";
@@ -21,12 +18,16 @@ public class PdfStructureService {
     "InvertedSegment", SEG_TYPE.INVERTED_SEGMENT,
     "VariableSegment", SEG_TYPE.VARIABLE_SEGMENT
   );
+  private static String templatesPath;
+  private static String mustachePrefix;
 
   private PdfStructureService() {
     // this class should not be initialized
   }
 
-  public static List<Structure> getStructure(String relativePath, Template template) {
+  public static List<Structure> getStructure(String relativePath, Template template, String templatesPath, String mustachePrefix) {
+    PdfStructureService.templatesPath = templatesPath;
+    PdfStructureService.mustachePrefix = mustachePrefix;
     var structure = new ArrayList<Structure>();
     try {
       var segsField = getField(Template.class, SEGS);
@@ -128,7 +129,7 @@ public class PdfStructureService {
       this.line = line;
       this.segType = segType;
       this.structures = structures;
-      this.isIncludedTemplateSegmentValid = SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT.equals(segType) && new File(TEMPLATES_PATH, name + "." + MUSTACHE_SUFFIX).exists();
+      this.isIncludedTemplateSegmentValid = SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT.equals(segType) && new File(templatesPath, name + "." + mustachePrefix).exists();
     }
 
     Structure(String parentFragment, String name, int line, SEG_TYPE segType) {

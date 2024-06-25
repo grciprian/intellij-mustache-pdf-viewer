@@ -13,9 +13,6 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.regex.Pattern;
 
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.MUSTACHE_SUFFIX;
-import static com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProviderKt.TEMPLATES_PATH;
-
 public class CustomMustacheCompiler {
 
   private static final BiFunction<CustomMustacheCompiler.FaultyType, String, String> DO_FAULTY_HTML_MESSAGE = (type, name) ->
@@ -30,33 +27,34 @@ public class CustomMustacheCompiler {
     return Escapers.HTML.escape(text);
   };
   private static Pair<String, Long> recursionCounter = Pair.empty();
-  private static final Mustache.TemplateLoader TEMPLATE_LOADER = name -> {
-    if (!Objects.equals(name, recursionCounter.first)) {
-      recursionCounter = new Pair<>(name, 1L);
-    } else {
-      recursionCounter = new Pair<>(recursionCounter.first, recursionCounter.second + 1);
-    }
-    if (recursionCounter.second > RECURSION_THRESHOLD) {
-      throw new RuntimeException("Recursion found for included template segment: " + name);
-    }
-    var file = new File(TEMPLATES_PATH, name + "." + MUSTACHE_SUFFIX);
-    if (!file.exists()) {
-      return new StringReader(DO_FAULTY_HTML_MESSAGE.apply(CustomMustacheCompiler.FaultyType.FAULTY_PARTIAL, name));
-    }
-    return new FileReader(file);
-  };
+  private static final BiFunction<String, String, Mustache.TemplateLoader> TEMPLATE_LOADER =
+    (templatesPath, mustacheSuffix) -> name -> {
+      if (!Objects.equals(name, recursionCounter.first)) {
+        recursionCounter = new Pair<>(name, 1L);
+      } else {
+        recursionCounter = new Pair<>(recursionCounter.first, recursionCounter.second + 1);
+      }
+      if (recursionCounter.second > RECURSION_THRESHOLD) {
+        throw new RuntimeException("Recursion found for included template segment: " + name);
+      }
+      var file = new File(templatesPath, name + "." + mustacheSuffix);
+      if (!file.exists()) {
+        return new StringReader(DO_FAULTY_HTML_MESSAGE.apply(CustomMustacheCompiler.FaultyType.FAULTY_PARTIAL, name));
+      }
+      return new FileReader(file);
+    };
   private static Mustache.Compiler instance;
 
   private CustomMustacheCompiler() {
   }
 
-  public static Mustache.Compiler getInstance() {
-    if (CustomMustacheCompiler.instance != null) return instance;
-    CustomMustacheCompiler.instance = Mustache.compiler()
-      .withLoader(TEMPLATE_LOADER)
+  public static Mustache.Compiler getInstance(String templatesPath, String mustacheSuffix) {
+    if (instance != null) return instance;
+    instance = Mustache.compiler()
+      .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix))
       .withEscaper(CUSTOM_ESCAPER)
       .withCollector(new CustomCollector());
-    return CustomMustacheCompiler.instance;
+    return instance;
   }
 
   private enum FaultyType {
