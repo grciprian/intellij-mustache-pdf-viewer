@@ -31,24 +31,26 @@ import org.apache.commons.io.FileUtils
 import java.nio.file.Path
 import java.util.*
 
-class MustacheContextServiceImpl(private val module: Module) : MustacheContextService, Disposable {
+class MustacheContextServiceImpl(module: Module) : MustacheContextService, Disposable {
 
   private val project = module.project
   private val settings = PdfViewerSettings.instance
   private var _mustachePrefix = settings.customMustachePrefix
   private var _mustacheSuffix = settings.customMustacheSuffix
-  private val modulePath = ModuleRootManager.getInstance(module).contentRoots.firstOrNull()?.canonicalPath
-  private var _templatesPath = getTemplatesPath(modulePath ?: project.basePath, _mustachePrefix)
+  private val modulePath = ModuleRootManager.getInstance(module).contentRoots.firstOrNull()?.canonicalPath ?: project.basePath
+  private var _templatesPath = getTemplatesPath(modulePath, _mustachePrefix)
   private val fileEditorManager = FileEditorManager.getInstance(project)
+  private val messageBusConnection = project.messageBus.connect()
+  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(_templatesPath, _mustacheSuffix, module.name)
+
+  /***
+   * Listeners
+   */
   private val fileChangedListener = FileChangedListener()
   private val appLifecycleListener = MyAppLifecycleListener()
   private val fileEditorManagerListener = MyFileEditorManagerListener()
   private val mustacheFilePropsListener = MyPdfViewerMustacheFilePropsSettingsListener()
   private val mustacheFontsPathListener = MyPdfViewerMustacheFontsPathSettingsListener()
-
-  // must be called last
-  private val messageBusConnection = project.messageBus.connect()
-  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(this)
 
   init {
     Disposer.register(this, messageBusConnection)
@@ -203,7 +205,7 @@ class MustacheContextServiceImpl(private val module: Module) : MustacheContextSe
         }
         root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot ?: return
         ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-          .rootChanged(root, selectedEditor.file!!)
+          .rootChanged(root, selectedEditor.file!!, getContext())
       }
       if (root == null && toolWindowInitialized) {
         toolWindowInitialized = false
@@ -271,21 +273,9 @@ class MustacheContextServiceImpl(private val module: Module) : MustacheContextSe
     }
   }
 
-  override fun getMustacheIncludeProcessor(): MustacheIncludeProcessor {
-    return _mustacheIncludeProcessor
+  override fun getContext(): MustacheContext {
+    return MustacheContext(_mustacheIncludeProcessor, _templatesPath, _mustachePrefix, _mustacheSuffix)
   }
-
-  val templatesPath: String
-    get() = _templatesPath
-
-  val mustachePrefix: String
-    get() = _mustachePrefix
-
-  val mustacheSuffix: String
-    get() = _mustacheSuffix
-
-  val moduleName: String
-    get() = module.name
 
   override fun dispose() {
     messageBusConnection.disconnect()
@@ -368,3 +358,10 @@ class MustacheContextServiceImpl(private val module: Module) : MustacheContextSe
     }
   }
 }
+
+data class MustacheContext(
+  val mustacheIncludeProcessor: MustacheIncludeProcessor,
+  val templatesPath: String,
+  val mustachePrefix: String,
+  val mustacheSuffix: String
+)

@@ -2,8 +2,6 @@ package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
 import com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
-import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl
-import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings.Companion.instance
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.service
@@ -16,7 +14,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
-import generate.Utils.getTemplatesPath
+import generate.Utils
 
 
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
@@ -29,9 +27,12 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
     if (file.fileType == PdfFileType) return true
-    val mustacheContextService = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
-      ?.service<MustacheContextService>() as MustacheContextServiceImpl
-    return mainProvider.accept(project, file) && file.extension == mustacheContextService.mustacheSuffix
+    val mustacheContext = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
+      ?.service<MustacheContextService>()?.getContext()!!
+    if (Utils.isFilePathUnderTemplatesPath(file.canonicalPath, mustacheContext.templatesPath)) {
+      return mainProvider.accept(project, file) && file.extension == mustacheContext.mustacheSuffix
+    }
+    return false
   }
 
   override fun createEditor(project: Project, file: VirtualFile): FileEditor {
@@ -47,9 +48,9 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
           pdfFileEditor = PdfFileEditor(project, file)
           return pdfFileEditor as PdfFileEditor
         }
-        val mustacheContextService = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
-          ?.service<MustacheContextService>() as MustacheContextServiceImpl
-        if (mainProvider.accept(project, file) && file.extension == mustacheContextService.mustacheSuffix) {
+        val mustacheContext = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
+          ?.service<MustacheContextService>()?.getContext()!!
+        if (mainProvider.accept(project, file) && file.extension == mustacheContext.mustacheSuffix) {
           mustacheFileEditor = MustacheFileEditor(project, file)
           return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview().build()
         }

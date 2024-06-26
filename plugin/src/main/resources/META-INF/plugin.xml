@@ -8,6 +8,13 @@
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true" config-file="texify-idea.xml">nl.rubensten.texifyidea</depends>
 
+  <module-components>
+    <component>
+      <interface-class>com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService</interface-class>
+      <implementation-class>com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl</implementation-class>
+    </component>
+  </module-components>
+
   <extensions defaultExtensionNs="com.intellij">
     <fileType name="PDF"
               extensions="pdf"
@@ -31,13 +38,6 @@
     <toolWindow id="Mustache" anchor="right"
                 factoryClass="com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory"/>
   </extensions>
-
-  <module-components>
-    <component>
-      <interface-class>com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService</interface-class>
-      <implementation-class>com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl</implementation-class>
-    </component>
-  </module-components>
 
   <applicationListeners>
     <listener class="com.firsttimeinforever.intellij.pdf.viewer.ui.widgets.PdfStatusBarProjectManagerListener"

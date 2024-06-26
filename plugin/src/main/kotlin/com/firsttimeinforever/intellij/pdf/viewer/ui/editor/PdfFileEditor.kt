@@ -1,6 +1,5 @@
 package com.firsttimeinforever.intellij.pdf.viewer.ui.editor
 
-import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.structureView.PdfStructureViewBuilder
@@ -8,7 +7,6 @@ import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheRef
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
 import com.intellij.ide.structureView.StructureViewBuilder
-import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -17,6 +15,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import generate.MustacheIncludeProcessor
 import javax.swing.JComponent
 
 // TODO: Implement state persistence
@@ -24,15 +23,15 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
   val viewComponent = PdfEditorViewComponent(project, pdfFile)
   private val messageBusConnection = project.messageBus.connect()
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
-  //todo fix here!
-  private val mustacheContextService = project.service<MustacheContextService>()
-  private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
+  private lateinit var mustacheIncludeProcessor: MustacheIncludeProcessor
   private var _rootName: String = null.toString()
   val rootName: String
     get() = _rootName
 
-  constructor(project: Project, pdfFile: VirtualFile, rootName: String) : this(project, pdfFile) {
+  constructor(project: Project, includeProcessor: MustacheIncludeProcessor, pdfFile: VirtualFile, rootName: String)
+    : this(project, pdfFile) {
     this._rootName = rootName
+    this.mustacheIncludeProcessor = includeProcessor
   }
 
   init {

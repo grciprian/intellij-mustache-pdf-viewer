@@ -25,14 +25,13 @@ class MustachePdfFileEditorWrapper(
   private val _jbTabbedPane = JBTabbedPane()
   private val _syncedTabbedEditors = mutableListOf<PdfFileEditor>()
   private val messageBusConnection = project.messageBus.connect()
-  private val mustacheContextService = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(mustacheFile)
-    ?.service<MustacheContextService>() as MustacheContextServiceImpl
-  private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
+  private val mustacheContext = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(mustacheFile)
+    ?.service<MustacheContextService>()?.getContext()!!
 
   // orice fisier mustache deschis are asociat un PdfFileEditorWrapper cu un TabbedPane
   init {
     Disposer.register(this, messageBusConnection)
-    mustacheIncludeProcessor.getRootsForMustache(mustacheFile.canonicalPath).forEach { addPdfFileEditorTab(it) }
+    mustacheContext.mustacheIncludeProcessor.getRootsForMustache(mustacheFile.canonicalPath).forEach { addPdfFileEditorTab(it) }
     messageBusConnection.subscribe(
       MustacheUpdatePdfFileEditorTabs.TOPIC,
       MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs() }
@@ -43,12 +42,12 @@ class MustachePdfFileEditorWrapper(
       if (_jbTabbedPane.selectedIndex < 0 || _jbTabbedPane.selectedIndex >= _syncedTabbedEditors.size) return@addChangeListener
       val root = _syncedTabbedEditors[source.selectedIndex].rootName
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-        .rootChanged(root, mustacheFile)
+        .rootChanged(root, mustacheFile, mustacheContext)
     }
   }
 
   private fun updatePdfFileEditorTabs() {
-    val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile.canonicalPath)
+    val updatedRoots = mustacheContext.mustacheIncludeProcessor.getRootsForMustache(mustacheFile.canonicalPath)
     val syncedTabbedRootNames = _syncedTabbedEditors.map { it.rootName }.toImmutableList()
 
     val livingRoots = syncedTabbedRootNames.intersect(updatedRoots)
@@ -57,7 +56,7 @@ class MustachePdfFileEditorWrapper(
 
     // if source fileRoots intersects this PdfFileEditorWrapper target fileRoots
     // then the mustache file that was modified impacted
-    livingRoots.forEach { mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
+    livingRoots.forEach { mustacheContext.mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
 
     // remove roots not needed anymore
     var i = 0
@@ -80,8 +79,8 @@ class MustachePdfFileEditorWrapper(
   }
 
   private fun addPdfFileEditorTab(rootName: String) {
-    val pdfFile = mustacheIncludeProcessor.processPdfFileForMustacheRoot(rootName)
-    val editor = PdfFileEditor(project, pdfFile, rootName)
+    val pdfFile = mustacheContext.mustacheIncludeProcessor.processPdfFileForMustacheRoot(rootName)
+    val editor = PdfFileEditor(project, mustacheContext.mustacheIncludeProcessor, pdfFile, rootName)
     Disposer.register(this, editor)
     _jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
     _syncedTabbedEditors.add(ADD_INDEX_FOR_NEW_TAB, editor)

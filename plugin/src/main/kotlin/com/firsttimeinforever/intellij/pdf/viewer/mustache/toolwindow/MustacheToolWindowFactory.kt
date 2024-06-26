@@ -1,17 +1,14 @@
 package com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow
 
-import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
-import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl
+import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContext
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory.MustacheToolWindowContent.Companion.Visitor
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.IconLoader
@@ -21,6 +18,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.ScrollPaneFactory
+import com.intellij.ui.components.JBLabel
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
 import com.jgoodies.common.base.Objects
@@ -60,13 +58,10 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
   private class MustacheToolWindowContent(private val project: Project, toolWindow: ToolWindow) : Disposable {
     private val _contentPanel = SimpleToolWindowPanel(true, true)
     private lateinit var _root: String
-    private lateinit var _templatesPath: String
-    private lateinit var _mustacheSuffix: String
     private lateinit var _selectedNodeName: String
+    private lateinit var _mustacheContext: MustacheContext
     private var _clickedNode: Pair<MustacheTreeNode, ClickedNodeStyle> = Pair.empty() // higher priority than _selectedNodeName
     private val messageBusConnection = project.messageBus.connect()
-    private val mustacheContextService = project.service<MustacheContextService>()
-    private val mustacheIncludeProcessor = mustacheContextService.getMustacheIncludeProcessor()
 
     init {
       Disposer.register(this, messageBusConnection)
@@ -75,20 +70,20 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         ActionManager.getInstance().getAction("mustache.tool.NavigatorActionsToolbar") as DefaultActionGroup,
         true
       )
+      val placehodlerComponent = JBLabel("Loading...")
+      _contentPanel.setContent(placehodlerComponent)
+      actionToolbar.targetComponent = placehodlerComponent
       _contentPanel.toolbar = actionToolbar.component
       messageBusConnection.subscribe(
         MustacheToolWindowListener.TOPIC,
         object : MustacheToolWindowListener {
-          override fun rootChanged(root: String, selectedMustache: VirtualFile) {
-            val mustacheContextService = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(selectedMustache)
-              ?.service<MustacheContextServiceImpl>() as MustacheContextServiceImpl
+          override fun rootChanged(root: String, selectedMustache: VirtualFile, mustacheContext: MustacheContext) {
             _root = root
-            _templatesPath = mustacheContextService.templatesPath
-            _mustacheSuffix = mustacheContextService.mustacheSuffix
+            _mustacheContext = mustacheContext
             _selectedNodeName = getRelativeMustacheFilePathFromTemplatesPath(
               selectedMustache.canonicalPath,
-              mustacheContextService.templatesPath,
-              mustacheContextService.mustacheSuffix
+              mustacheContext.templatesPath,
+              mustacheContext.mustacheSuffix
             )
             handleTreeInContentPanel()
           }
@@ -98,7 +93,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
           }
 
           private fun handleTreeInContentPanel() {
-            Optional.ofNullable(mustacheIncludeProcessor.getPdfForRoot(_root))
+            Optional.ofNullable(_mustacheContext.mustacheIncludeProcessor.getPdfForRoot(_root))
               .map(PdfGenerationService.Pdf::structures)
               .map { createTree(_root, it, _selectedNodeName) }
               .ifPresentOrElse({
@@ -128,7 +123,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
       buildTreeNodesFromStructures(rootNode, visitor)
       val tree = Tree(DefaultTreeModel(rootNode))
-      tree.addMouseListener(TreeMouseListener(project, _templatesPath, _mustacheSuffix) {
+      tree.addMouseListener(TreeMouseListener(project, _mustacheContext.templatesPath, _mustacheContext.mustacheSuffix) {
         _clickedNode = it
       })
 

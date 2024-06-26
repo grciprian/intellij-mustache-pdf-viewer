@@ -27,6 +27,7 @@ public class Utils {
   public static String getTemplatesPath(String modulePath, String mustachePrefix) {
     Objects.requireNonNull(modulePath, "modulePath must not be null");
     try {
+      //TODO review here
       return Path.of(modulePath, "/src/main/resources/%s/".formatted(mustachePrefix)).toFile().getCanonicalPath();
     } catch (IOException e) {
       throw new RuntimeException("Templates folder does not exist");
