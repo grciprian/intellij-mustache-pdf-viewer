@@ -1,8 +1,5 @@
 package generate;
 
-import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl;
-import com.intellij.openapi.module.Module;
-import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -23,12 +20,10 @@ public class Utils {
   private Utils() {
   }
 
-  // TODO maybe rethink this?
   public static String getTemplatesPath(String modulePath, String mustachePrefix) {
     Objects.requireNonNull(modulePath, "modulePath must not be null");
     try {
-      //TODO review here
-      return Path.of(modulePath, "/src/main/resources/%s/".formatted(mustachePrefix)).toFile().getCanonicalPath();
+      return Path.of(modulePath, "/src/main/resources/%s".formatted(mustachePrefix)).toFile().getCanonicalPath();
     } catch (IOException e) {
       throw new RuntimeException("Templates folder does not exist");
     }

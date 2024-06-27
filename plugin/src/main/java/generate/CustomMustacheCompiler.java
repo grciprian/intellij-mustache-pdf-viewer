@@ -18,14 +18,14 @@ public class CustomMustacheCompiler {
   private static final BiFunction<CustomMustacheCompiler.FaultyType, String, String> DO_FAULTY_HTML_MESSAGE = (type, name) ->
     "<span style=\"color: red !important;\">[" + type.name() + ">" + name + "]</span>";
   private static final String FAULTY_HTML_REGEX_MATCHER = "<span style=\"color: red !important;\">\\[FAULTY_VAR>.*?\\]<\\/span>";
-  // maybe make this customizable in settings?
-  private static final Long RECURSION_THRESHOLD = 500L;
   private static final Mustache.Escaper CUSTOM_ESCAPER = text -> {
     if (Pattern.compile(FAULTY_HTML_REGEX_MATCHER).matcher(text).find()) {
       return text;
     }
     return Escapers.HTML.escape(text);
   };
+  // maybe make this customizable in settings?
+  private static final Long RECURSION_THRESHOLD = 500L;
   private static Pair<String, Long> recursionCounter = Pair.empty();
   private static final BiFunction<String, String, Mustache.TemplateLoader> TEMPLATE_LOADER =
     (templatesPath, mustacheSuffix) -> name -> {

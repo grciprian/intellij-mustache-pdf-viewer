@@ -1,17 +1,21 @@
 package generate;
 
-import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContext;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.samskivert.mustache.Mustache;
 import generate.PdfGenerationService.Pdf;
 
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-import static com.intellij.openapi.vfs.VfsUtilCore.loadText;
 import static generate.Utils.getPdf;
 import static generate.Utils.getRelativeMustacheFilePathFromTemplatesPath;
 
@@ -26,6 +30,27 @@ public class MustacheIncludeProcessor {
   private final String mustacheSuffix;
   private final String moduleName;
 
+  // be careful to clean it up properly before each template compilation
+  private final Set<String> currentlyTemplateLoaderFoundIncludes = new HashSet<>();
+  // maybe make this customizable in settings?
+  private static final Long RECURSION_THRESHOLD = 500L;
+  private Pair<String, Long> recursionCounter = Pair.empty();
+  private final BiFunction<String, String, Mustache.TemplateLoader> TEMPLATE_LOADER =
+    (templatesPath, mustacheSuffix) -> name -> {
+      if (!Objects.equals(name, recursionCounter.first)) {
+        recursionCounter = new Pair<>(name, 1L);
+      } else {
+        recursionCounter = new Pair<>(recursionCounter.first, recursionCounter.second + 1);
+      }
+      if (recursionCounter.second > RECURSION_THRESHOLD) {
+        throw new RuntimeException("Recursion found for included template segment: " + name);
+      }
+      var file = new File(templatesPath, name + "." + mustacheSuffix);
+      if (file.exists()) currentlyTemplateLoaderFoundIncludes.add(name);
+      return new StringReader("");
+    };
+  private final Mustache.Compiler mustacheCompiler;
+
   private MustacheIncludeProcessor(String templatesPath, String mustacheSuffix, String moduleName) {
     Objects.requireNonNull(templatesPath, "templatesPath must not be null");
     Objects.requireNonNull(mustacheSuffix, "mustacheSuffix must not be null");
@@ -33,6 +58,8 @@ public class MustacheIncludeProcessor {
     this.templatesPath = templatesPath;
     this.mustacheSuffix = mustacheSuffix;
     this.moduleName = moduleName;
+    mustacheCompiler = Mustache.compiler()
+      .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix));
     processFileIncludePropsMap();
   }
 
@@ -53,33 +80,28 @@ public class MustacheIncludeProcessor {
         return true;
       }
       var relativePath = getRelativeMustacheFilePathFromTemplatesPath(mustacheFile.getCanonicalPath(), templatesPath, mustacheSuffix);
-      if (relativePath == null) {
-        return true;
-      }
+      if (relativePath == null) return true;
+
       if (!includePropsMap.containsKey(relativePath)) {
         includePropsMap.put(relativePath, IncludeProps.getEmpty());
       }
+
       try {
-        var contents = loadText(mustacheFile);
-        var first = true;
-        for (var include : contents.split("(\\{\\{>)")) {
-          if (first) {
-            first = false;
-            continue;
-          }
-          var indexOfIncludeEnd = include.indexOf("}}");
-          if (indexOfIncludeEnd == -1) {
-//            throw new RuntimeException("Malformed include found!");
-            continue;
-          }
-          var cleanedUpInclude = include.substring(0, indexOfIncludeEnd);
-          var maybeExistingEntry = includePropsMap.getOrDefault(cleanedUpInclude, IncludeProps.getEmpty());
-          maybeExistingEntry.directParents.add(relativePath);
-          includePropsMap.put(cleanedUpInclude, new IncludeProps(maybeExistingEntry.directParents));
-        }
+        mustacheCompiler.defaultValue("").compile(new FileReader(mustacheFile.getPath())).execute(new Object());
+        currentlyTemplateLoaderFoundIncludes
+          .forEach(include -> {
+            var normalizedInclude = include.replaceAll("/+", "/");
+            if(!normalizedInclude.startsWith("/")) normalizedInclude = "/" + normalizedInclude;
+            var maybeExistingEntry = includePropsMap.getOrDefault(normalizedInclude, IncludeProps.getEmpty());
+            maybeExistingEntry.directParents.add(relativePath);
+            includePropsMap.put(normalizedInclude, new IncludeProps(maybeExistingEntry.directParents));
+          });
+        currentlyTemplateLoaderFoundIncludes.clear();
       } catch (IOException e) {
+        //TODO: customize this
         throw new RuntimeException(e);
       }
+
       return true;
     });
 
