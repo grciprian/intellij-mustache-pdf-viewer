@@ -34,6 +34,7 @@ import java.nio.file.Path
 import java.util.*
 import javax.swing.JPanel
 import javax.swing.JTree
+import javax.swing.SwingConstants
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
@@ -70,7 +71,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
         ActionManager.getInstance().getAction("mustache.tool.NavigatorActionsToolbar") as DefaultActionGroup,
         true
       )
-      val placehodlerComponent = JBLabel("Loading...")
+      val placehodlerComponent = JBLabel("Loading...", SwingConstants.CENTER)
       _contentPanel.setContent(placehodlerComponent)
       actionToolbar.targetComponent = placehodlerComponent
       _contentPanel.toolbar = actionToolbar.component
@@ -108,7 +109,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
     private fun createTree(root: String, structures: List<Structure>, selectedNodeName: String?): JTree {
       val rootStructure = Structure.createRoot(root, structures)
-      rootStructure.customToString = Optional.ofNullable(selectedNodeName).map { v -> "$v @ $root" }.orElse(root)
+      rootStructure.customToString = Optional.ofNullable(selectedNodeName).map { v -> "/$v @ /$root" }.orElse(root)
       val rootNode = MustacheTreeNode(rootStructure)
       val selectedNodes = mutableListOf<MustacheTreeNode>()
       val visitor = Visitor { node ->
@@ -179,7 +180,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       }
 
       private fun navigateToFile(mustacheRelativePath: String, line: Int, selectLine: Boolean = false) {
-        val file = VfsUtil.findFile(Path.of("$templatesPath$mustacheRelativePath.$mustacheSuffix"), true)
+        val file = VfsUtil.findFile(Path.of("$templatesPath/$mustacheRelativePath.$mustacheSuffix"), true)
           ?: return
         val ln = line.coerceAtLeast(1) - 1
         val editor =

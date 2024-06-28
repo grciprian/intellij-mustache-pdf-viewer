@@ -81,7 +81,7 @@ public class PdfGenerationService {
 
   public PdfContent generatePdf(Object model, String relativeFilePath) {
     try (var outputStream = new ByteArrayOutputStream()) {
-      var canonicalFilePath = Path.of("%s%s.%s".formatted(templatesPath, relativeFilePath, mustacheSuffix)).toFile().getCanonicalPath();
+      var canonicalFilePath = Path.of("%s/%s.%s".formatted(templatesPath, relativeFilePath, mustacheSuffix)).toFile().getCanonicalPath();
       var template = mustacheCompiler.compile(new FileReader(canonicalFilePath));
       var html = template.execute(model);
       writePdfContentToStream(outputStream, html);

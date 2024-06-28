@@ -30,7 +30,7 @@ public class Utils {
   }
 
   public static boolean isFilePathUnderTemplatesPath(String filePath, String templatesPath) {
-    return filePath.startsWith(templatesPath);
+    return filePath.startsWith(templatesPath + "/");
   }
 
   public static String getRelativeMustacheFilePathFromTemplatesPath(String filePath, String templatesPath, String mustacheSuffix) {
@@ -38,7 +38,7 @@ public class Utils {
     if (extensionPointIndex < 0) return null;
     var extension = filePath.subSequence(extensionPointIndex + 1, filePath.length());
     if (!mustacheSuffix.contentEquals(extension)) return null;
-    return filePath.substring(templatesPath.length(), extensionPointIndex);
+    return filePath.substring(templatesPath.length() + 1, extensionPointIndex);
   }
 
   public static Pdf getPdf(String relativeFilePath, String templatesPath, String mustacheSuffix, String moduleName) {

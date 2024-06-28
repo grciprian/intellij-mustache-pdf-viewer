@@ -91,7 +91,7 @@ public class MustacheIncludeProcessor {
         currentlyTemplateLoaderFoundIncludes
           .forEach(include -> {
             var normalizedInclude = include.replaceAll("/+", "/");
-            if(!normalizedInclude.startsWith("/")) normalizedInclude = "/" + normalizedInclude;
+            if(normalizedInclude.startsWith("/")) normalizedInclude = normalizedInclude.substring(1);
             var maybeExistingEntry = includePropsMap.getOrDefault(normalizedInclude, IncludeProps.getEmpty());
             maybeExistingEntry.directParents.add(relativePath);
             includePropsMap.put(normalizedInclude, new IncludeProps(maybeExistingEntry.directParents));

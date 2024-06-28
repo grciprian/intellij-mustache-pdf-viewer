@@ -151,8 +151,9 @@ public class PdfStructureService {
     @Override
     public String toString() {
       var segT = Optional.ofNullable(segType).map(SEG_TYPE::getValue).orElse("");
+      var nam = SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT.equals(segType) ? "/" + name : name;
       return Optional.ofNullable(customToString)
-        .orElse("%s%s, line=%d".formatted(segT, name, line));
+        .orElse("%s%s, line=%d".formatted(segT, nam, line));
     }
 
     @Override
