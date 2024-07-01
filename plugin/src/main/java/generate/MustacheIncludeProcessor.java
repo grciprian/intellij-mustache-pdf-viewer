@@ -4,6 +4,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.Producer;
 import com.samskivert.mustache.Mustache;
 import generate.PdfGenerationService.Pdf;
 
@@ -24,10 +25,22 @@ public class MustacheIncludeProcessor {
   private static final Logger logger = Logger.getInstance(MustacheIncludeProcessor.class);
   private static MustacheIncludeProcessor instance;
   private final Map<String, PdfFileExpirationWrapper> rootPdfFileMap = new HashMap<>();
-  private final Map<String, MustacheIncludeProcessor.IncludeProps> oldIncludePropsMap = new HashMap<>();
-  private final Map<String, MustacheIncludeProcessor.IncludeProps> includePropsMap = new HashMap<>();
-  private final String templatesPath;
-  private final String mustacheSuffix;
+  private final Map<String, IncludeProps> oldIncludePropsMap = new HashMap<>();
+  private final Map<String, IncludeProps> includePropsMap = new HashMap<>();
+
+  private String templatesPath;
+  private String mustacheSuffix;
+
+  public MustacheIncludeProcessor setTemplatesPath(String templatesPath) {
+    this.templatesPath = templatesPath;
+    return this;
+  }
+
+  public MustacheIncludeProcessor setMustacheSuffix(String mustacheSuffix) {
+    this.mustacheSuffix = mustacheSuffix;
+    return this;
+  }
+
   private final String moduleName;
 
   // be careful to clean it up properly before each template compilation
@@ -51,22 +64,21 @@ public class MustacheIncludeProcessor {
     };
   private final Mustache.Compiler mustacheCompiler;
 
-  private MustacheIncludeProcessor(String templatesPath, String mustacheSuffix, String moduleName) {
-    Objects.requireNonNull(templatesPath, "templatesPath must not be null");
-    Objects.requireNonNull(mustacheSuffix, "mustacheSuffix must not be null");
+  private MustacheIncludeProcessor(String moduleName) {
     Objects.requireNonNull(moduleName, "moduleName must not be null");
-    this.templatesPath = templatesPath;
-    this.mustacheSuffix = mustacheSuffix;
     this.moduleName = moduleName;
     mustacheCompiler = Mustache.compiler()
       .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix));
-    processFileIncludePropsMap();
+//    processFileIncludePropsMap();
   }
 
   public static MustacheIncludeProcessor getInstance(String templatesPath, String mustacheSuffix, String moduleName) {
-    if (MustacheIncludeProcessor.instance != null) return MustacheIncludeProcessor.instance;
-    MustacheIncludeProcessor.instance = new MustacheIncludeProcessor(templatesPath, mustacheSuffix, moduleName);
-    return MustacheIncludeProcessor.instance;
+    var inst = (Producer<MustacheIncludeProcessor>) () -> instance
+      .setTemplatesPath(templatesPath)
+      .setMustacheSuffix(mustacheSuffix);
+    if (instance != null) return inst.produce();
+    instance = new MustacheIncludeProcessor(moduleName);
+    return inst.produce();
   }
 
   public void processFileIncludePropsMap() {
@@ -91,7 +103,7 @@ public class MustacheIncludeProcessor {
         currentlyTemplateLoaderFoundIncludes
           .forEach(include -> {
             var normalizedInclude = include.replaceAll("/+", "/");
-            if(normalizedInclude.startsWith("/")) normalizedInclude = normalizedInclude.substring(1);
+            if (normalizedInclude.startsWith("/")) normalizedInclude = normalizedInclude.substring(1);
             var maybeExistingEntry = includePropsMap.getOrDefault(normalizedInclude, IncludeProps.getEmpty());
             maybeExistingEntry.directParents.add(relativePath);
             includePropsMap.put(normalizedInclude, new IncludeProps(maybeExistingEntry.directParents));

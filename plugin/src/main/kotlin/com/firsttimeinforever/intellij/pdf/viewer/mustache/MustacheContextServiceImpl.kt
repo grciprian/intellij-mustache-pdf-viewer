@@ -35,13 +35,11 @@ class MustacheContextServiceImpl(module: Module) : MustacheContextService, Dispo
 
   private val project = module.project
   private val settings = PdfViewerSettings.instance
-  private var _mustachePrefix = settings.customMustachePrefix
-  private var _mustacheSuffix = settings.customMustacheSuffix
   private val modulePath = ModuleRootManager.getInstance(module).contentRoots.firstOrNull()?.canonicalPath ?: project.basePath
-  private var _templatesPath = getTemplatesPath(modulePath, _mustachePrefix)
+  private var _templatesPath = getTemplatesPath(modulePath, settings.customMustachePrefix)
   private val fileEditorManager = FileEditorManager.getInstance(project)
   private val messageBusConnection = project.messageBus.connect()
-  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(_templatesPath, _mustacheSuffix, module.name)
+  private val _mustacheIncludeProcessor = MustacheIncludeProcessor.getInstance(_templatesPath, settings.customMustacheSuffix, module.name)
 
   /***
    * Listeners
@@ -234,8 +232,6 @@ class MustacheContextServiceImpl(module: Module) : MustacheContextService, Dispo
       val beforeModMustacheEditorsFiles =
         fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(it.file.canonicalPath, _templatesPath) }.map { it.file }
           .toImmutableSet()
-      _mustachePrefix = settings.customMustachePrefix
-      _mustacheSuffix = settings.customMustacheSuffix
       val afterModMustacheEditorsFiles =
         fileEditorManager.allEditors.filter { isFilePathUnderTemplatesPath(it.file.canonicalPath, _templatesPath) }.map { it.file }
           .toImmutableSet()
@@ -247,7 +243,7 @@ class MustacheContextServiceImpl(module: Module) : MustacheContextService, Dispo
       // if we now have an editor open for the new templates folder then we can recalculate TEMPLATES_PATH for specialized mustache editors to open
       Optional.ofNullable(afterModMustacheEditorsFiles.firstOrNull())
         .ifPresentOrElse(
-          { _templatesPath = getTemplatesPath(modulePath, _mustachePrefix) },
+          { _templatesPath = getTemplatesPath(modulePath, settings.customMustachePrefix) },
           {
             println("FilePropsChanged: Not editor open so the TEMPLATES_PATH haven't have to be modified right now. It would be updated on the next valid opened mustache.")
             _templatesPath = null.toString()
@@ -274,7 +270,7 @@ class MustacheContextServiceImpl(module: Module) : MustacheContextService, Dispo
   }
 
   override fun getContext(): MustacheContext {
-    return MustacheContext(_mustacheIncludeProcessor, _templatesPath, _mustachePrefix, _mustacheSuffix)
+    return MustacheContext(_mustacheIncludeProcessor, _templatesPath, settings.customMustachePrefix, settings.customMustacheSuffix)
   }
 
   override fun dispose() {

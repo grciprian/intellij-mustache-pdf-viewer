@@ -1,6 +1,7 @@
 package generate;
 
 import com.intellij.openapi.util.Pair;
+import com.intellij.util.Producer;
 import com.samskivert.mustache.DefaultCollector;
 import com.samskivert.mustache.Escapers;
 import com.samskivert.mustache.Mustache;
@@ -49,12 +50,13 @@ public class CustomMustacheCompiler {
   }
 
   public static Mustache.Compiler getInstance(String templatesPath, String mustacheSuffix) {
-    if (instance != null) return instance;
+    var inst = (Producer<Mustache.Compiler>) () -> instance
+      .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix));
+    if (instance != null) return inst.produce();
     instance = Mustache.compiler()
-      .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix))
       .withEscaper(CUSTOM_ESCAPER)
       .withCollector(new CustomCollector());
-    return instance;
+    return inst.produce();
   }
 
   private enum FaultyType {

@@ -3,6 +3,7 @@ package generate;
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.Producer;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
 import generate.PdfStructureService.Structure;
@@ -28,20 +29,34 @@ public class PdfGenerationService {
     <pre style="word-wrap: break-word; white-space: pre-wrap;">{{stackTrace}}</pre>
     """;
   private static PdfGenerationService instance;
-  private final Mustache.Compiler mustacheCompiler;
-  private final String templatesPath;
-  private final String mustacheSuffix;
 
-  private PdfGenerationService(String templatesPath, String mustacheSuffix) {
+  private String templatesPath;
+  private String mustacheSuffix;
+  private Mustache.Compiler mustacheCompiler;
+
+  public PdfGenerationService setTemplatesPath(String templatesPath) {
     this.templatesPath = templatesPath;
+    return this;
+  }
+
+  public PdfGenerationService setMustacheSuffix(String mustacheSuffix) {
     this.mustacheSuffix = mustacheSuffix;
-    this.mustacheCompiler = CustomMustacheCompiler.getInstance(templatesPath, mustacheSuffix);
+    return this;
+  }
+
+  public PdfGenerationService setMustacheCompiler(Mustache.Compiler mustacheCompiler) {
+    this.mustacheCompiler = mustacheCompiler;
+    return this;
   }
 
   public static PdfGenerationService getInstance(String templatesPath, String mustacheSuffix) {
-    if (instance != null) return instance;
-    instance = new PdfGenerationService(templatesPath, mustacheSuffix);
-    return instance;
+    var inst = (Producer<PdfGenerationService>) () -> instance
+      .setTemplatesPath(templatesPath)
+      .setMustacheSuffix(mustacheSuffix)
+      .setMustacheCompiler(CustomMustacheCompiler.getInstance(templatesPath, mustacheSuffix));
+    if (instance != null) return inst.produce();
+    instance = new PdfGenerationService();
+    return inst.produce();
   }
 
   private static void writePdfContentToStream(OutputStream outputStream, String html) throws IOException {
