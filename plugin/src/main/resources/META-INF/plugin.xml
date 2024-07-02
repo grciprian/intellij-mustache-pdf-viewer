@@ -8,19 +8,13 @@
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true" config-file="texify-idea.xml">nl.rubensten.texifyidea</depends>
 
-  <module-components>
-    <component>
-      <interface-class>com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService</interface-class>
-      <implementation-class>com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl</implementation-class>
-    </component>
-  </module-components>
-
   <extensions defaultExtensionNs="com.intellij">
     <fileType name="PDF"
               extensions="pdf"
               language="PDF"
               fieldName="INSTANCE"
               implementationClass="com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType"/>
+    <projectService serviceInterface="com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService" serviceImplementation="com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextServiceImpl"/>
     <fileEditorProvider implementation="com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditorProvider"/>
     <httpRequestHandler implementation="com.firsttimeinforever.intellij.pdf.viewer.jcef.PdfStaticServer"/>
 

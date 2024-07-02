@@ -25,8 +25,7 @@ class MustachePdfFileEditorWrapper(
   private val _jbTabbedPane = JBTabbedPane()
   private val _syncedTabbedEditors = mutableListOf<PdfFileEditor>()
   private val messageBusConnection = project.messageBus.connect()
-  private val mustacheContext = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(mustacheFile)
-    ?.service<MustacheContextService>()?.getContext()!!
+  private val mustacheContext = project.getService(MustacheContextService::class.java).getContext(mustacheFile)
 
   // orice fisier mustache deschis are asociat un PdfFileEditorWrapper cu un TabbedPane
   init {

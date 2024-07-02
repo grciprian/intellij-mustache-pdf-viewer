@@ -69,7 +69,6 @@ public class MustacheIncludeProcessor {
     this.moduleName = moduleName;
     mustacheCompiler = Mustache.compiler()
       .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix));
-//    processFileIncludePropsMap();
   }
 
   public static MustacheIncludeProcessor getInstance(String templatesPath, String mustacheSuffix, String moduleName) {

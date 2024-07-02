@@ -4,18 +4,15 @@ import com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import generate.Utils
-
 
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
@@ -27,8 +24,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
     if (file.fileType == PdfFileType) return true
-    val mustacheContext = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
-      ?.service<MustacheContextService>()?.getContext()!!
+    val mustacheContext = project.getService(MustacheContextService::class.java).getContext(file)
     if (Utils.isFilePathUnderTemplatesPath(file.canonicalPath, mustacheContext.templatesPath)) {
       return mainProvider.accept(project, file) && file.extension == mustacheContext.mustacheSuffix
     }
@@ -48,8 +44,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
           pdfFileEditor = PdfFileEditor(project, file)
           return pdfFileEditor as PdfFileEditor
         }
-        val mustacheContext = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
-          ?.service<MustacheContextService>()?.getContext()!!
+        val mustacheContext = project.getService(MustacheContextService::class.java).getContext(file)
         if (mainProvider.accept(project, file) && file.extension == mustacheContext.mustacheSuffix) {
           mustacheFileEditor = MustacheFileEditor(project, file)
           return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview().build()

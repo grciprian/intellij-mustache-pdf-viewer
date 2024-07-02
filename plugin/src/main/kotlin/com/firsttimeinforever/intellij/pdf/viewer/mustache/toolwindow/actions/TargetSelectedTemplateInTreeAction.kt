@@ -21,11 +21,11 @@ class TargetSelectedTemplateInTreeAction : MustacheAction() {
     if (lastActiveEditor.name == MustacheFileEditor.NAME) {
       val tree = e.dataContext.getData(PlatformDataKeys.CONTEXT_COMPONENT) as? JTree ?: return
       val project = e.dataContext.getData(PlatformDataKeys.PROJECT) ?: return
-      val mustacheContext = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(lastActiveEditor.editor.virtualFile)
-        ?.service<MustacheContextService>()?.getContext()!!
+      val file = lastActiveEditor.editor.virtualFile
+      val mustacheContext = project.getService(MustacheContextService::class.java).getContext(file)
       val relativeFilePath =
         getRelativeMustacheFilePathFromTemplatesPath(
-          lastActiveEditor.editor.virtualFile.canonicalPath,
+          file.canonicalPath,
           mustacheContext.templatesPath,
           mustacheContext.mustacheSuffix
         )
