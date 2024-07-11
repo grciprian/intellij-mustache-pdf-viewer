@@ -23,9 +23,13 @@ public class Utils {
   public static String getTemplatesPath(String modulePath, String mustachePrefix) {
     Objects.requireNonNull(modulePath, "modulePath must not be null");
     try {
-      return Path.of(modulePath, "/src/main/resources/%s".formatted(mustachePrefix)).toFile().getCanonicalPath();
+      var templatesFolder = Path.of(modulePath, "/src/main/resources/%s".formatted(mustachePrefix)).toFile();
+      if (!templatesFolder.exists()) {
+        throw new RuntimeException("Templates folder does not exist");
+      }
+      return templatesFolder.getCanonicalPath();
     } catch (IOException e) {
-      throw new RuntimeException("Templates folder does not exist");
+      throw new RuntimeException("Templates folder does not exist", e);
     }
   }
 

@@ -5,9 +5,7 @@ import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheTr
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.PlatformDataKeys
-import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
-import com.intellij.openapi.roots.ProjectRootManager
 import generate.PdfStructureService.SEG_TYPE
 import generate.PdfStructureService.Structure
 import generate.Utils.getRelativeMustacheFilePathFromTemplatesPath
