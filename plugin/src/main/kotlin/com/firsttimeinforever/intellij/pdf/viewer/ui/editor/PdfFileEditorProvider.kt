@@ -12,7 +12,6 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
-import generate.Utils
 
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
@@ -24,11 +23,14 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
     if (file.fileType == PdfFileType) return true
-    val mustacheContext = project.getService(MustacheContextService::class.java).getContext(file)
-    if (Utils.isFilePathUnderTemplatesPath(file.canonicalPath, mustacheContext.templatesPath)) {
-      return mainProvider.accept(project, file) && file.extension == mustacheContext.mustacheSuffix
+    try {
+      // try to get mustache context for a possible valid file
+      project.getService(MustacheContextService::class.java).getContext(file)
+      return mainProvider.accept(project, file)
+    } catch (e: RuntimeException) {
+      // file was not mustache context valid
+      return false
     }
-    return false
   }
 
   override fun createEditor(project: Project, file: VirtualFile): FileEditor {
@@ -44,10 +46,16 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
           pdfFileEditor = PdfFileEditor(project, file)
           return pdfFileEditor as PdfFileEditor
         }
-        val mustacheContext = project.getService(MustacheContextService::class.java).getContext(file)
-        if (mainProvider.accept(project, file) && file.extension == mustacheContext.mustacheSuffix) {
-          mustacheFileEditor = MustacheFileEditor(project, file)
-          return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview().build()
+        try {
+          if (mainProvider.accept(project, file)) {
+            // try to get mustache context for a possible valid file
+            val context = project.getService(MustacheContextService::class.java).getContext(file)
+            context.mustacheIncludeProcessor.processFileIncludePropsMap()
+            mustacheFileEditor = MustacheFileEditor(project, file)
+            return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview().build()
+          }
+        } catch (e: RuntimeException) {
+          // file was not mustache context valid
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
       }

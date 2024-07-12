@@ -28,7 +28,7 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
   val rootName: String
     get() = _rootName
 
-  constructor(project: Project, includeProcessor: MustacheIncludeProcessor, pdfFile: VirtualFile, rootName: String)
+  constructor(project: Project, pdfFile: VirtualFile, rootName: String, includeProcessor: MustacheIncludeProcessor)
     : this(project, pdfFile) {
     this._rootName = rootName
     this.mustacheIncludeProcessor = includeProcessor

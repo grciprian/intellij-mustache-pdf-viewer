@@ -8,7 +8,6 @@ import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import generate.PdfStructureService.SEG_TYPE
 import generate.PdfStructureService.Structure
-import generate.Utils.getRelativeMustacheFilePathFromTemplatesPath
 import javax.swing.JTree
 import javax.swing.tree.TreePath
 
@@ -21,23 +20,17 @@ class TargetSelectedTemplateInTreeAction : MustacheAction() {
       val project = e.dataContext.getData(PlatformDataKeys.PROJECT) ?: return
       val file = lastActiveEditor.editor.virtualFile
       val mustacheContext = project.getService(MustacheContextService::class.java).getContext(file)
-      val relativeFilePath =
-        getRelativeMustacheFilePathFromTemplatesPath(
-          file.canonicalPath,
-          mustacheContext.templatesPath,
-          mustacheContext.mustacheSuffix
-        )
       val selectedNodes = mutableListOf<MustacheTreeNode>()
 
       if (tree.rowCount > 0
-        && ((tree.getPathForRow(0).lastPathComponent as MustacheTreeNode).userObject as Structure).name() == relativeFilePath
+        && ((tree.getPathForRow(0).lastPathComponent as MustacheTreeNode).userObject as Structure).name() == mustacheContext.relativeFilePath
       ) {
         selectedNodes.add(tree.getPathForRow(0).lastPathComponent as MustacheTreeNode)
       } else {
         for (i in 1 until tree.rowCount) {
           val node = tree.getPathForRow(i).lastPathComponent as MustacheTreeNode
           val nodeStructure = node.userObject as Structure
-          if (nodeStructure.name() == relativeFilePath && nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT) {
+          if (nodeStructure.name() == mustacheContext.relativeFilePath && nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT) {
             selectedNodes.add(node)
           }
         }

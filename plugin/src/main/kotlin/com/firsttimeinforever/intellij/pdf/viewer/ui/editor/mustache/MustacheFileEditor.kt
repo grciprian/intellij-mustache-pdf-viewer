@@ -24,10 +24,6 @@ class MustacheFileEditor(
   private lateinit var preview: MustachePdfFileEditorWrapper
   private lateinit var _textEditorWithPreview: TextEditorWithPreview
 
-  init {
-
-  }
-
   private fun createEditorBuilder(): AsyncFileEditorProvider.Builder {
     if (provider is AsyncFileEditorProvider) {
       return runBlockingCancellable {

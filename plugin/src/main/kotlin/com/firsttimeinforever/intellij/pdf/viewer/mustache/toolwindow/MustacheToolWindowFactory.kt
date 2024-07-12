@@ -14,7 +14,6 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.ScrollPaneFactory
@@ -25,7 +24,6 @@ import com.jgoodies.common.base.Objects
 import generate.PdfGenerationService
 import generate.PdfStructureService.SEG_TYPE
 import generate.PdfStructureService.Structure
-import generate.Utils.getRelativeMustacheFilePathFromTemplatesPath
 import org.jetbrains.annotations.NotNull
 import org.jetbrains.annotations.Nullable
 import java.awt.event.MouseAdapter
@@ -59,7 +57,6 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
   private class MustacheToolWindowContent(private val project: Project, toolWindow: ToolWindow) : Disposable {
     private val _contentPanel = SimpleToolWindowPanel(true, true)
     private lateinit var _root: String
-    private lateinit var _selectedNodeName: String
     private lateinit var _mustacheContext: MustacheContext
     private var _clickedNode: Pair<MustacheTreeNode, ClickedNodeStyle> = Pair.empty() // higher priority than _selectedNodeName
     private val messageBusConnection = project.messageBus.connect()
@@ -78,14 +75,9 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       messageBusConnection.subscribe(
         MustacheToolWindowListener.TOPIC,
         object : MustacheToolWindowListener {
-          override fun rootChanged(root: String, selectedMustache: VirtualFile, mustacheContext: MustacheContext) {
+          override fun rootChanged(root: String, mustacheContext: MustacheContext) {
             _root = root
             _mustacheContext = mustacheContext
-            _selectedNodeName = getRelativeMustacheFilePathFromTemplatesPath(
-              selectedMustache.canonicalPath,
-              mustacheContext.templatesPath,
-              mustacheContext.mustacheSuffix
-            )
             handleTreeInContentPanel()
           }
 
@@ -96,7 +88,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
           private fun handleTreeInContentPanel() {
             Optional.ofNullable(_mustacheContext.mustacheIncludeProcessor.getPdfForRoot(_root))
               .map(PdfGenerationService.Pdf::structures)
-              .map { createTree(_root, it, _selectedNodeName) }
+              .map { createTree(_root, it, _mustacheContext.relativeFilePath) }
               .ifPresentOrElse({
                 actionToolbar.targetComponent = it
                 _contentPanel.setContent(ScrollPaneFactory.createScrollPane(it))

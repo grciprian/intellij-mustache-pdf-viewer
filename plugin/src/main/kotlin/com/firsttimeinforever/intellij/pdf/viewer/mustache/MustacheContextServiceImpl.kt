@@ -35,7 +35,7 @@ import java.nio.file.Path
 @Service(Service.Level.PROJECT)
 class MustacheContextServiceImpl(private val project: Project) : MustacheContextService, Disposable {
 
-  private val moduleMustacheContextCache = HashMap<String, MustacheContext>() // <ModuleDirCanonicalPath, MustacheContext>
+  private val moduleMustacheContextCache = HashMap<String, MustacheContextInternal>() // <ModuleDirCanonicalPath, MustacheContextInternal>
   private val messageBusConnection = project.messageBus.connect()
 
   /***
@@ -79,17 +79,15 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         ) { file, event ->
           println("Target file ${file?.canonicalPath} changed. Reloading current view.")
           file ?: return@watchPath
-          manageMustacheProcessingForFile(file, event)
+          manageMustacheProcessingForFile(file, event, it.mustacheIncludeProcessor)
           manageMustacheEditors(file, event.type)
         }
       }
     }
 
     private fun manageMustacheProcessingForFile(
-      file: VirtualFile, event: WatcherFileEvent
+      file: VirtualFile, event: WatcherFileEvent, mustacheIncludeProcessor: MustacheIncludeProcessor
     ) {
-      val mustacheContext = getContext(file)
-      val mustacheIncludeProcessor = mustacheContext.mustacheIncludeProcessor
       mustacheIncludeProcessor.processFileIncludePropsMap()
       invalidateRoots(file, event, mustacheIncludeProcessor)
       project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs()
@@ -205,9 +203,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           toolWindow?.show()
         }
         root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot ?: return
-        val file = selectedEditor.file!!
         ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-          .rootChanged(root, file, getContext(file))
+          .rootChanged(root, getContext(selectedEditor.file!!))
       }
       if (root == null && toolWindowInitialized) {
         toolWindowInitialized = false
@@ -296,29 +293,32 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     if (file.extension != PdfViewerSettings.instance.customMustacheSuffix) throw RuntimeException("File does not have a valid mustache extension")
     val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
       ?: throw RuntimeException("Could not get module for file ${file.canonicalPath}")
-    println("Initializing mustache context for module... " + module.name)
     val modulePath = ModuleRootManager.getInstance(module).module.guessModuleDir()?.canonicalPath ?: project.basePath!!
 
-    if(moduleMustacheContextCache[modulePath] != null) return moduleMustacheContextCache[modulePath]!!
-
     val templatesPath = getTemplatesPath(modulePath, PdfViewerSettings.instance.customMustachePrefix)
-    if(!isFilePathUnderTemplatesPath(file.canonicalPath, templatesPath)) {
+    if (!isFilePathUnderTemplatesPath(file.canonicalPath, templatesPath)) {
       throw RuntimeException("File is not under templates folder [templatesPath, filePath] [${templatesPath}, ${file.canonicalPath}]")
     }
 
-    val mustacheIncludeProcessor =
-      MustacheIncludeProcessor.getInstance(templatesPath, PdfViewerSettings.instance.customMustacheSuffix, module.name)
-    val relativeFilePath =
+    val internal = if (moduleMustacheContextCache[modulePath] == null) {
+      val context = MustacheContextInternal(
+        MustacheIncludeProcessor.getInstance(templatesPath, PdfViewerSettings.instance.customMustacheSuffix, module.name),
+        templatesPath,
+        PdfViewerSettings.instance.customMustachePrefix,
+        PdfViewerSettings.instance.customMustacheSuffix
+      )
+      moduleMustacheContextCache[modulePath] = context
+      println("Initializing and caching mustache context for module... " + module.name)
+      context
+    } else {
+      println("Retrieving from cache mustache context for module... " + module.name)
+      moduleMustacheContextCache[modulePath]!!
+    }
+
+    return MustacheContext(
+      internal,
       getRelativeMustacheFilePathFromTemplatesPath(file.canonicalPath, templatesPath, PdfViewerSettings.instance.customMustacheSuffix)
-    val mustacheContext = MustacheContext(
-      mustacheIncludeProcessor,
-      templatesPath,
-      PdfViewerSettings.instance.customMustachePrefix,
-      PdfViewerSettings.instance.customMustacheSuffix,
-      relativeFilePath
     )
-    moduleMustacheContextCache[modulePath] = mustacheContext
-    return mustacheContext
   }
 
   override fun dispose() {
@@ -401,6 +401,13 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       }
     }
   }
+
+  data class MustacheContextInternal(
+    val mustacheIncludeProcessor: MustacheIncludeProcessor,
+    val templatesPath: String,
+    val mustachePrefix: String,
+    val mustacheSuffix: String
+  )
 }
 
 data class MustacheContext(
@@ -409,4 +416,9 @@ data class MustacheContext(
   val mustachePrefix: String,
   val mustacheSuffix: String,
   val relativeFilePath: String
-)
+) {
+  constructor(
+    internal: MustacheContextServiceImpl.MustacheContextInternal,
+    relativeFilePath: String
+  ) : this(internal.mustacheIncludeProcessor, internal.templatesPath, internal.mustachePrefix, internal.mustacheSuffix, relativeFilePath)
+}
