@@ -4,7 +4,6 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.util.Producer;
 import com.samskivert.mustache.Mustache;
 import generate.PdfGenerationService.Pdf;
 
@@ -14,7 +13,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import static generate.Utils.getPdf;
@@ -28,56 +26,44 @@ public class MustacheIncludeProcessor {
   private final Map<String, IncludeProps> oldIncludePropsMap = new HashMap<>();
   private final Map<String, IncludeProps> includePropsMap = new HashMap<>();
 
-  private String templatesPath;
-  private String mustacheSuffix;
-
-  public MustacheIncludeProcessor setTemplatesPath(String templatesPath) {
-    this.templatesPath = templatesPath;
-    return this;
-  }
-
-  public MustacheIncludeProcessor setMustacheSuffix(String mustacheSuffix) {
-    this.mustacheSuffix = mustacheSuffix;
-    return this;
-  }
-
+  private final String templatesPath;
+  private final String mustacheSuffix;
   private final String moduleName;
 
   // be careful to clean it up properly before each template compilation
-  private final Set<String> currentlyTemplateLoaderFoundIncludes = new HashSet<>();
+  private final Set<String> currentlyTemplateLoaderFoundIncludesNormalized = new HashSet<>();
   // maybe make this customizable in settings?
   private static final Long RECURSION_THRESHOLD = 500L;
   private Pair<String, Long> recursionCounter = Pair.empty();
-  private final BiFunction<String, String, Mustache.TemplateLoader> TEMPLATE_LOADER =
-    (templatesPath, mustacheSuffix) -> name -> {
-      if (!Objects.equals(name, recursionCounter.first)) {
-        recursionCounter = new Pair<>(name, 1L);
-      } else {
-        recursionCounter = new Pair<>(recursionCounter.first, recursionCounter.second + 1);
-      }
-      if (recursionCounter.second > RECURSION_THRESHOLD) {
-        throw new RuntimeException("Recursion found for included template segment: " + name);
-      }
-      var file = new File(templatesPath, name + "." + mustacheSuffix);
-      if (file.exists()) currentlyTemplateLoaderFoundIncludes.add(name);
-      return new StringReader("");
-    };
   private final Mustache.Compiler mustacheCompiler;
 
-  private MustacheIncludeProcessor(String moduleName) {
+  private MustacheIncludeProcessor(String templatesPath, String mustacheSuffix, String moduleName) {
     Objects.requireNonNull(moduleName, "moduleName must not be null");
+    this.templatesPath = templatesPath;
+    this.mustacheSuffix = mustacheSuffix;
     this.moduleName = moduleName;
-    mustacheCompiler = Mustache.compiler()
-      .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix));
+    this.mustacheCompiler = Mustache.compiler()
+      .withLoader(name -> {
+        if (!Objects.equals(name, recursionCounter.first)) {
+          recursionCounter = new Pair<>(name, 1L);
+        } else {
+          recursionCounter = new Pair<>(recursionCounter.first, recursionCounter.second + 1);
+        }
+        if (recursionCounter.second > RECURSION_THRESHOLD) {
+          throw new RuntimeException("Recursion found for included template segment: " + name);
+        }
+        var file = new File(templatesPath, name + "." + mustacheSuffix);
+        if (file.exists()) currentlyTemplateLoaderFoundIncludesNormalized.add(Path.of(name).toString());
+        return new StringReader("");
+      });
   }
 
   public static MustacheIncludeProcessor getInstance(String templatesPath, String mustacheSuffix, String moduleName) {
-    var inst = (Producer<MustacheIncludeProcessor>) () -> instance
-      .setTemplatesPath(templatesPath)
-      .setMustacheSuffix(mustacheSuffix);
-    if (instance != null) return inst.produce();
-    instance = new MustacheIncludeProcessor(moduleName);
-    return inst.produce();
+    if (instance != null
+      && Objects.equals(instance.templatesPath, templatesPath)
+      && Objects.equals(instance.mustacheSuffix, mustacheSuffix)
+      && Objects.equals(instance.moduleName, moduleName)) return instance;
+    return instance = new MustacheIncludeProcessor(templatesPath, mustacheSuffix, moduleName);
   }
 
   public void processFileIncludePropsMap() {
@@ -90,7 +76,7 @@ public class MustacheIncludeProcessor {
       if (mustacheFile.isDirectory()) {
         return true;
       }
-      var relativePath = getRelativeMustacheFilePathFromTemplatesPath(mustacheFile.getCanonicalPath(), templatesPath, mustacheSuffix);
+      var relativePath = getRelativeMustacheFilePathFromTemplatesPath(mustacheFile.toNioPath().toFile().getAbsolutePath(), templatesPath, mustacheSuffix);
       if (relativePath == null) return true;
 
       if (!includePropsMap.containsKey(relativePath)) {
@@ -99,15 +85,13 @@ public class MustacheIncludeProcessor {
 
       try {
         mustacheCompiler.defaultValue("").compile(new FileReader(mustacheFile.getPath())).execute(new Object());
-        currentlyTemplateLoaderFoundIncludes
+        currentlyTemplateLoaderFoundIncludesNormalized
           .forEach(include -> {
-            var normalizedInclude = include.replaceAll("/+", "/");
-            if (normalizedInclude.startsWith("/")) normalizedInclude = normalizedInclude.substring(1);
-            var maybeExistingEntry = includePropsMap.getOrDefault(normalizedInclude, IncludeProps.getEmpty());
+            var maybeExistingEntry = includePropsMap.getOrDefault(include, IncludeProps.getEmpty());
             maybeExistingEntry.directParents.add(relativePath);
-            includePropsMap.put(normalizedInclude, new IncludeProps(maybeExistingEntry.directParents));
+            includePropsMap.put(include, new IncludeProps(maybeExistingEntry.directParents));
           });
-        currentlyTemplateLoaderFoundIncludes.clear();
+        currentlyTemplateLoaderFoundIncludesNormalized.clear();
       } catch (IOException e) {
         //TODO: customize this
         throw new RuntimeException(e);
@@ -139,22 +123,22 @@ public class MustacheIncludeProcessor {
       .forEach(rootPdfFileMap::remove);
   }
 
-  public Set<String> getOldRootsForMustache(String canonicalFilePath) {
-    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(canonicalFilePath, templatesPath, mustacheSuffix);
+  public Set<String> getOldRootsForMustache(String filePath) {
+    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(filePath, templatesPath, mustacheSuffix);
     return oldIncludePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
       .orElse(Set.of());
-//      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getCanonicalPath()));
+//      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getAbsolutePath()));
   }
 
-  public Set<String> getRootsForMustache(String canonicalFilePath) {
-    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(canonicalFilePath, templatesPath, mustacheSuffix);
+  public Set<String> getRootsForMustache(String filePath) {
+    var relativePath = getRelativeMustacheFilePathFromTemplatesPath(filePath, templatesPath, mustacheSuffix);
     return includePropsMap.entrySet().stream()
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
       .orElse(Set.of());
-//      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getCanonicalPath()));
+//      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getAbsolutePath()));
   }
 
   public void invalidateRootPdfs() {
@@ -185,13 +169,10 @@ public class MustacheIncludeProcessor {
   public String getMustacheRootForPdfFile(VirtualFile pdfFile) throws RuntimeException {
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
-      .filter(entry -> Objects.equals(entry.getValue().pdf.file().getCanonicalPath(), pdfFile.getCanonicalPath()))
+      .filter(entry -> Objects.equals(entry.getValue().pdf.file().toNioPath().toFile().getAbsolutePath(), pdfFile.toNioPath().toFile().getAbsolutePath()))
       .findAny()
       .map(Map.Entry::getKey)
-      .orElseGet(() -> {
-//        new RuntimeException("No root key found for pdfFile with canonical path: " + pdfFile.getCanonicalPath())
-        return null;
-      });
+      .orElseGet(() -> null);
   }
 
   public Pdf getPdfForRoot(String root) {

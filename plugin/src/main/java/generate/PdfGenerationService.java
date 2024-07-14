@@ -3,7 +3,6 @@ package generate;
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.util.Producer;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
 import generate.PdfStructureService.Structure;
@@ -18,6 +17,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 
 public class PdfGenerationService {
 
@@ -30,33 +30,21 @@ public class PdfGenerationService {
     """;
   private static PdfGenerationService instance;
 
-  private String templatesPath;
-  private String mustacheSuffix;
-  private Mustache.Compiler mustacheCompiler;
+  private final String templatesPath;
+  private final String mustacheSuffix;
+  private final Mustache.Compiler mustacheCompiler;
 
-  public PdfGenerationService setTemplatesPath(String templatesPath) {
+  public PdfGenerationService(String templatesPath, String mustacheSuffix) {
     this.templatesPath = templatesPath;
-    return this;
-  }
-
-  public PdfGenerationService setMustacheSuffix(String mustacheSuffix) {
     this.mustacheSuffix = mustacheSuffix;
-    return this;
-  }
-
-  public PdfGenerationService setMustacheCompiler(Mustache.Compiler mustacheCompiler) {
-    this.mustacheCompiler = mustacheCompiler;
-    return this;
+    this.mustacheCompiler = CustomMustacheCompiler.getInstance(templatesPath, mustacheSuffix).getMustacheCompiler();
   }
 
   public static PdfGenerationService getInstance(String templatesPath, String mustacheSuffix) {
-    var inst = (Producer<PdfGenerationService>) () -> instance
-      .setTemplatesPath(templatesPath)
-      .setMustacheSuffix(mustacheSuffix)
-      .setMustacheCompiler(CustomMustacheCompiler.getInstance(templatesPath, mustacheSuffix));
-    if (instance != null) return inst.produce();
-    instance = new PdfGenerationService();
-    return inst.produce();
+    if (instance != null
+      && Objects.equals(instance.templatesPath, templatesPath)
+      && Objects.equals(instance.mustacheSuffix, mustacheSuffix)) return instance;
+    return instance = new PdfGenerationService(templatesPath, mustacheSuffix);
   }
 
   private static void writePdfContentToStream(OutputStream outputStream, String html) throws IOException {
@@ -96,8 +84,8 @@ public class PdfGenerationService {
 
   public PdfContent generatePdf(Object model, String relativeFilePath) {
     try (var outputStream = new ByteArrayOutputStream()) {
-      var canonicalFilePath = Path.of("%s/%s.%s".formatted(templatesPath, relativeFilePath, mustacheSuffix)).toFile().getCanonicalPath();
-      var template = mustacheCompiler.compile(new FileReader(canonicalFilePath));
+      var filePath = Path.of("%s\\%s.%s".formatted(templatesPath, relativeFilePath, mustacheSuffix)).toFile().getAbsolutePath();
+      var template = mustacheCompiler.compile(new FileReader(filePath));
       var html = template.execute(model);
       writePdfContentToStream(outputStream, html);
       var pdf = outputStream.toByteArray();

@@ -5,7 +5,7 @@ import org.junit.Test;
 
 public class PdfContentStructureServiceTest {
 
-  Mustache.Compiler customMustacheCompiler = CustomMustacheCompiler.getInstance("templatesPath", "mustacheSuffix");
+  Mustache.Compiler customMustacheCompiler = CustomMustacheCompiler.getInstance("templatesPath", "mustacheSuffix").getMustacheCompiler();
 
   @Test
   public void testGetSimpleStructure() {

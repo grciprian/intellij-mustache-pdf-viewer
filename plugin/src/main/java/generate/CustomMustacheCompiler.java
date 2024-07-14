@@ -1,7 +1,6 @@
 package generate;
 
 import com.intellij.openapi.util.Pair;
-import com.intellij.util.Producer;
 import com.samskivert.mustache.DefaultCollector;
 import com.samskivert.mustache.Escapers;
 import com.samskivert.mustache.Mustache;
@@ -44,19 +43,29 @@ public class CustomMustacheCompiler {
       }
       return new FileReader(file);
     };
-  private static Mustache.Compiler instance;
+  private static CustomMustacheCompiler instance;
+  private final String templatesPath;
+  private final String mustacheSuffix;
+  private final Mustache.Compiler mustacheCompiler;
 
-  private CustomMustacheCompiler() {
+  private CustomMustacheCompiler(String templatesPath, String mustacheSuffix) {
+    this.templatesPath = templatesPath;
+    this.mustacheSuffix = mustacheSuffix;
+    this.mustacheCompiler = Mustache.compiler()
+      .withEscaper(CUSTOM_ESCAPER)
+      .withCollector(new CustomCollector())
+      .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix));
   }
 
-  public static Mustache.Compiler getInstance(String templatesPath, String mustacheSuffix) {
-    var inst = (Producer<Mustache.Compiler>) () -> instance
-      .withLoader(TEMPLATE_LOADER.apply(templatesPath, mustacheSuffix));
-    if (instance != null) return inst.produce();
-    instance = Mustache.compiler()
-      .withEscaper(CUSTOM_ESCAPER)
-      .withCollector(new CustomCollector());
-    return inst.produce();
+  public static CustomMustacheCompiler getInstance(String templatesPath, String mustacheSuffix) {
+    if (instance != null
+      && Objects.equals(instance.templatesPath, templatesPath)
+      && Objects.equals(instance.mustacheSuffix, mustacheSuffix)) return instance;
+    return instance = new CustomMustacheCompiler(templatesPath, mustacheSuffix);
+  }
+
+  public Mustache.Compiler getMustacheCompiler() {
+    return mustacheCompiler;
   }
 
   private enum FaultyType {

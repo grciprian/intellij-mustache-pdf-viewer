@@ -101,7 +101,12 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
     private fun createTree(root: String, structures: List<Structure>, selectedNodeName: String?): JTree {
       val rootStructure = Structure.createRoot(root, structures)
-      rootStructure.customToString = Optional.ofNullable(selectedNodeName).map { v -> "/$v @ /$root" }.orElse(root)
+      val normalize = { t: String -> Path.of(t).toString().replace(Regex("\\\\"), "/") }
+      val nr = normalize(root)
+      rootStructure.customToString = Optional.ofNullable(selectedNodeName).map { v ->
+        val nv = normalize(v)
+        "/$nv @ /$nr"
+      }.orElse(root)
       val rootNode = MustacheTreeNode(rootStructure)
       val selectedNodes = mutableListOf<MustacheTreeNode>()
       val visitor = Visitor { node ->

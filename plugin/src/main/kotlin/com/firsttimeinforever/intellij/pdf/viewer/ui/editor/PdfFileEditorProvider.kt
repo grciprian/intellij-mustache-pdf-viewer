@@ -4,6 +4,7 @@ import com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
@@ -29,6 +30,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
       return mainProvider.accept(project, file)
     } catch (e: RuntimeException) {
       // file was not mustache context valid
+      logger.error(e.message)
       return false
     }
   }
@@ -56,6 +58,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
           }
         } catch (e: RuntimeException) {
           // file was not mustache context valid
+          logger.error(e.message)
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
       }
@@ -69,5 +72,6 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
   companion object {
     private const val PDF = "PDF"
+    private val logger = logger<PdfFileEditorProvider>()
   }
 }
