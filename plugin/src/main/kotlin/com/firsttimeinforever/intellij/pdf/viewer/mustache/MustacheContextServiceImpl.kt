@@ -78,7 +78,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         watchPath(
           it.templatesPath, events
         ) { file, event ->
-          logger.debug("Target file ${file?.toNioPath()?.absolutePathString()} changed. Reloading current view.")
+          logger.debug("Target file ${file?.path} changed. Reloading current view.")
           file ?: return@watchPath
           manageMustacheProcessingForFile(file, event, it.mustacheIncludeProcessor)
           manageMustacheEditors(file, event.type)
@@ -101,7 +101,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     ) {
       val needUpdateMustacheFileRoots = HashSet<String>()
       fun pushToNeedUpdate(f: VirtualFile, rootDir: VirtualFile? = null) {
-        var normalizedOldRootsFilePath = f.toNioPath().absolutePathString()
+        var oldRootsFilePath = f.path
         if (listOf(
             WatcherFileEvent.Type.MOVE_INSIDE_PATH,
             WatcherFileEvent.Type.MOVE_OUT,
@@ -111,19 +111,19 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           val eOldPath =
             if (event.e is VFileMoveEvent) event.e.oldPath else if (event.e is VFilePropertyChangeEvent) event.e.oldPath else null
           if (eOldPath != null) {
-            normalizedOldRootsFilePath = if (rootDir != null) {
-              val absoluteFilePath = f.toNioPath().absolutePathString()
-              val absoluteRootPath = rootDir.toNioPath().absolutePathString()
-              Objects.requireNonNull(absoluteFilePath, "absoluteFilePath of child file must not be null")
-              Objects.requireNonNull(absoluteRootPath, "absoluteRootPath must not be null")
-              val relativePathFromDirRootToFile = absoluteFilePath.substring(absoluteRootPath.length + 1)
-              Path.of(eOldPath).absolutePathString() + "\\" + relativePathFromDirRootToFile
+            oldRootsFilePath = if (rootDir != null) {
+              val filePath = f.path
+              val rootPath = rootDir.path
+              Objects.requireNonNull(filePath, "filePath of child file must not be null")
+              Objects.requireNonNull(rootPath, "rootPath must not be null")
+              val relativePathFromDirRootToFile = filePath.substring(rootPath.length + 1)
+              eOldPath + FileUtils. + relativePathFromDirRootToFile
             } else {
               Path.of(eOldPath).absolutePathString()
             }
           }
         }
-        val oldMustacheFileRoots = mustacheIncludeProcessor.getOldRootsForMustache(normalizedOldRootsFilePath)
+        val oldMustacheFileRoots = mustacheIncludeProcessor.getOldRootsForMustache(oldRootsFilePath)
         val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(f.toNioPath().absolutePathString())
         needUpdateMustacheFileRoots.addAll(oldMustacheFileRoots)
         needUpdateMustacheFileRoots.addAll(updatedMustacheFileRoots)
@@ -354,12 +354,11 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
       var file: VirtualFile? = null
       var event: WatcherFileEvent? = null
-      val normalizedWatchedPath = Path.of(watchedPath).absolutePathString()
 
-      fun checkFilePathWithWatchedPathBasedOnFileType(eventFilePath: String, isDirectory: Boolean): Boolean {
-        val normalizedEventFilePath = Path.of(eventFilePath).absolutePathString()
-        if (isDirectory) return normalizedEventFilePath == normalizedWatchedPath || normalizedEventFilePath.startsWith("$normalizedWatchedPath\\")
-        return normalizedEventFilePath.startsWith("$normalizedWatchedPath\\")
+      fun checkFilePathWithWatchedPathBasedOnFileType(eventFilePath: String?, isDirectory: Boolean): Boolean {
+        eventFilePath ?: return false
+        if (isDirectory) return eventFilePath == watchedPath || eventFilePath.startsWith("$watchedPath/")
+        return eventFilePath.startsWith("$watchedPath/")
       }
 
       if (events.any {
@@ -369,17 +368,17 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           if (it is VFileCopyEvent) {
             event = WatcherFileEvent(WatcherFileEvent.Type.COPY, it)
             return@any checkFilePathWithWatchedPathBasedOnFileType(
-              it.findCreatedFile()?.toNioPath()?.absolutePathString() ?: "",
+              it.findCreatedFile()?.path,
               isDirectory
             )
           }
           if (it is VFileCreateEvent) {
             event = WatcherFileEvent(WatcherFileEvent.Type.CREATE, it)
-            return@any checkFilePathWithWatchedPathBasedOnFileType(file!!.toNioPath().absolutePathString() ?: "", isDirectory)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(file?.path, isDirectory)
           }
           if (it is VFileDeleteEvent) {
             event = WatcherFileEvent(WatcherFileEvent.Type.DELETE, it)
-            return@any checkFilePathWithWatchedPathBasedOnFileType(file!!.toNioPath().absolutePathString() ?: "", isDirectory)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(file?.path, isDirectory)
           }
           if (it is VFileMoveEvent) {
             val oldPathCheck = checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
@@ -397,7 +396,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           }
           if (it is VFileContentChangeEvent) {
             event = WatcherFileEvent(WatcherFileEvent.Type.CHANGE_CONTENT, it)
-            return@any checkFilePathWithWatchedPathBasedOnFileType(file!!.toNioPath().absolutePathString() ?: "", isDirectory)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(file?.path, isDirectory)
           }
           if (it is VFilePropertyChangeEvent) {
             event = if (it.oldPath != it.newPath) {
@@ -405,10 +404,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
             } else {
               WatcherFileEvent(WatcherFileEvent.Type.CHANGE_OTHER_PROPERTY, it)
             }
-            return@any (checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory) || checkFilePathWithWatchedPathBasedOnFileType(
-              it.newPath,
-              isDirectory
-            ))
+            return@any (checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
+              || checkFilePathWithWatchedPathBasedOnFileType(it.newPath, isDirectory))
           }
           return@any false
         }) {
