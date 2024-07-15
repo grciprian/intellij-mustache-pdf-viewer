@@ -17,7 +17,6 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessModuleDir
-import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VfsUtil
@@ -112,12 +111,13 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
             if (event.e is VFileMoveEvent) event.e.oldPath else if (event.e is VFilePropertyChangeEvent) event.e.oldPath else null
           if (eOldPath != null) {
             oldRootsFilePath = if (rootDir != null) {
-              val filePath = f.path
-              val rootPath = rootDir.path
-              Objects.requireNonNull(filePath, "filePath of child file must not be null")
-              Objects.requireNonNull(rootPath, "rootPath must not be null")
-              val relativePathFromDirRootToFile = filePath.substring(rootPath.length + 1)
-              eOldPath + FileUtils. + relativePathFromDirRootToFile
+              // TODO here first treat path
+              val absoluteFilePath = f.toNioPath().absolutePathString()
+              val absoluteRootPath = rootDir.toNioPath().absolutePathString()
+              Objects.requireNonNull(absoluteFilePath, "absoluteFilePath of child file must not be null")
+              Objects.requireNonNull(absoluteRootPath, "absoluteRootPath must not be null")
+              val relativePathFromDirRootToFile = absoluteFilePath.substring(absoluteRootPath.length + 1)
+              Path.of(eOldPath).absolutePathString() + "\\" + relativePathFromDirRootToFile
             } else {
               Path.of(eOldPath).absolutePathString()
             }
@@ -293,18 +293,21 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
   override fun getContext(file: VirtualFile): MustacheContext {
     if (file.extension != PdfViewerSettings.instance.customMustacheSuffix) throw RuntimeException("File does not have a valid mustache extension")
-    val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
-      ?: throw RuntimeException("Could not get module for file ${file.toNioPath().absolutePathString()}")
-    val modulePath = ModuleRootManager.getInstance(module).module.guessModuleDir()?.toNioPath()?.absolutePathString() ?: project.basePath!!
 
-    val templatesPath = getTemplatesPath(modulePath, PdfViewerSettings.instance.customMustachePrefix)
-    if (!isFilePathUnderTemplatesPath(file.toNioPath().absolutePathString(), templatesPath)) {
+    val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
+      ?: throw RuntimeException("Could not get module for file ${file.path}")
+    val moduleDir = module.guessModuleDir()
+      ?: throw RuntimeException("Could not get moduleDir for file ${file.path}")
+
+    val templatesDir = getTemplatesDir(moduleDir, PdfViewerSettings.instance.customMustachePrefix)
+    if(!VfsUtil.isUnder(file, setOf(templatesDir))) {
       throw RuntimeException(
-        "File is not under templates folder [templatesPath, filePath] [${templatesPath}, ${
-          file.toNioPath().absolutePathString()
-        }]"
+        "File is not under templates folder [templatesPath, filePath] [${templatesDir.path}, ${file.path}]"
       )
     }
+
+    val modulePath = moduleDir.path
+    val templatesPath = templatesDir.path
 
     val internal = if (moduleMustacheContextCache[modulePath] == null) {
       val context = MustacheContextInternal(
@@ -323,11 +326,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     return MustacheContext(
       internal,
-      getRelativeMustacheFilePathFromTemplatesPath(
-        file.toNioPath().absolutePathString(),
-        templatesPath,
-        PdfViewerSettings.instance.customMustacheSuffix
-      )
+      VfsUtil.getRelativePath(file, templatesDir) ?: throw RuntimeException("Could not get relative path from templatesDir to file for [templatesPath, filePath] [${templatesDir.path}, ${file.path}]")
     )
   }
 

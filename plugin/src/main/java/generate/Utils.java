@@ -2,6 +2,7 @@ package generate;
 
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import generate.PdfGenerationService.Pdf;
 
 import java.io.IOException;
@@ -19,13 +20,13 @@ public class Utils {
   private Utils() {
   }
 
-  public static String getTemplatesPath(String modulePath, String mustachePrefix) {
-    Objects.requireNonNull(modulePath, "modulePath must not be null");
-    var templatesFolder = Path.of(modulePath, "src/main/resources/%s".formatted(mustachePrefix)).toFile();
-    if (!templatesFolder.exists()) {
+  public static VirtualFile getTemplatesDir(VirtualFile moduleDir, String mustachePrefix) {
+    Objects.requireNonNull(moduleDir, "moduleDir must not be null");
+    var templatesFolder = VfsUtil.findRelativeFile(moduleDir, "src", "main", "resources", mustachePrefix);
+    if (templatesFolder == null || !templatesFolder.exists()) {
       throw new RuntimeException("Templates folder does not exist");
     }
-    return templatesFolder.getAbsolutePath();
+    return templatesFolder;
   }
 
   public static boolean isFilePathUnderTemplatesPath(String filePath, String templatesPath) {
