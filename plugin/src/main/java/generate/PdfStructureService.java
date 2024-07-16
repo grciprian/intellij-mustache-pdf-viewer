@@ -1,5 +1,6 @@
 package generate;
 
+import com.intellij.openapi.util.io.FileUtil;
 import com.samskivert.mustache.Template;
 
 import java.io.File;
@@ -19,15 +20,15 @@ public class PdfStructureService {
     "VariableSegment", SEG_TYPE.VARIABLE_SEGMENT
   );
   private static String templatesPath;
-  private static String mustachePrefix;
+  private static String mustacheSuffix;
 
   private PdfStructureService() {
     // this class should not be initialized
   }
 
-  public static List<Structure> getStructure(String relativePath, Template template, String templatesPath, String mustachePrefix) {
+  public static List<Structure> getStructure(String relativePath, Template template, String templatesPath, String mustacheSuffix) {
     PdfStructureService.templatesPath = templatesPath;
-    PdfStructureService.mustachePrefix = mustachePrefix;
+    PdfStructureService.mustacheSuffix = mustacheSuffix;
     var structure = new ArrayList<Structure>();
     try {
       var segsField = getField(Template.class, SEGS);
@@ -116,6 +117,7 @@ public class PdfStructureService {
   public static final class Structure {
     private final String parentFragment;
     private final String name;
+    private final String nameNormalized;
     private final int line;
     private final SEG_TYPE segType;
     private final List<Structure> structures;
@@ -126,10 +128,13 @@ public class PdfStructureService {
     public Structure(String parentFragment, String name, int line, SEG_TYPE segType, List<Structure> structures) {
       this.parentFragment = parentFragment;
       this.name = name;
+      this.nameNormalized = Optional.ofNullable(name)
+        .map(nam -> FileUtil.normalize(nam).replaceAll("^/+", ""))
+        .orElse(null);
       this.line = line;
       this.segType = segType;
       this.structures = structures;
-      this.isIncludedTemplateSegmentValid = SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT.equals(segType) && new File(templatesPath, name + "." + mustachePrefix).exists();
+      this.isIncludedTemplateSegmentValid = SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT.equals(segType) && new File(templatesPath, name + "." + mustacheSuffix).exists();
     }
 
     Structure(String parentFragment, String name, int line, SEG_TYPE segType) {
@@ -173,8 +178,8 @@ public class PdfStructureService {
       return parentFragment;
     }
 
-    public String name() {
-      return name;
+    public String normalizedName() {
+      return nameNormalized;
     }
 
     public int line() {

@@ -114,7 +114,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
           if (Objects.equals(node.userObject as Structure, _clickedNode.first.userObject as Structure)) {
             selectedNodes.add(node)
           }
-        } else if ((node.userObject as Structure).name() == selectedNodeName) {
+        } else if ((node.userObject as Structure).normalizedName() == selectedNodeName) {
           selectedNodes.add(node)
         }
       }
@@ -165,7 +165,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
       private fun handleLeftClick(node: MustacheTreeNode) {
         val nodeStructure = node.userObject as Structure
         if (nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT && nodeStructure.isIncludedTemplateSegmentValid) {
-          navigateToFile(nodeStructure.name(), 0)
+          navigateToFile(nodeStructure.normalizedName(), 0)
         } else {
           navigateToFile(nodeStructure.parentFragment(), nodeStructure.line(), !nodeStructure.isRoot)
         }

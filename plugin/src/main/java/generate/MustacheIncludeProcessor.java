@@ -2,6 +2,7 @@ package generate;
 
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Pair;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.samskivert.mustache.Mustache;
@@ -21,21 +22,19 @@ import static generate.Utils.getRelativeMustacheFilePathFromTemplatesPath;
 public class MustacheIncludeProcessor {
 
   private static final Logger logger = Logger.getInstance(MustacheIncludeProcessor.class);
+  // maybe make this customizable in settings?
+  private static final Long RECURSION_THRESHOLD = 500L;
   private static MustacheIncludeProcessor instance;
   private final Map<String, PdfFileExpirationWrapper> rootPdfFileMap = new HashMap<>();
   private final Map<String, IncludeProps> oldIncludePropsMap = new HashMap<>();
   private final Map<String, IncludeProps> includePropsMap = new HashMap<>();
-
   private final String templatesPath;
   private final String mustacheSuffix;
   private final String moduleName;
-
   // be careful to clean it up properly before each template compilation
   private final Set<String> currentlyTemplateLoaderFoundIncludesNormalized = new HashSet<>();
-  // maybe make this customizable in settings?
-  private static final Long RECURSION_THRESHOLD = 500L;
-  private Pair<String, Long> recursionCounter = Pair.empty();
   private final Mustache.Compiler mustacheCompiler;
+  private Pair<String, Long> recursionCounter = Pair.empty();
 
   private MustacheIncludeProcessor(String templatesPath, String mustacheSuffix, String moduleName) {
     Objects.requireNonNull(moduleName, "moduleName must not be null");
@@ -53,7 +52,8 @@ public class MustacheIncludeProcessor {
           throw new RuntimeException("Recursion found for included template segment: " + name);
         }
         var file = new File(templatesPath, name + "." + mustacheSuffix);
-        if (file.exists()) currentlyTemplateLoaderFoundIncludesNormalized.add(Path.of(name).toString());
+        var normalizedName = FileUtil.normalize(name).replaceAll("^/+", "");
+        if (file.exists()) currentlyTemplateLoaderFoundIncludesNormalized.add(normalizedName);
         return new StringReader("");
       });
   }

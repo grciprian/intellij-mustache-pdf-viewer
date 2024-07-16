@@ -318,7 +318,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     return MustacheContext(
       internal,
-      VfsUtil.getRelativePath(file, templatesDir) ?: throw RuntimeException("Could not get relative path from templatesDir to file for [templatesPath, filePath] [${templatesDir.path}, ${file.path}]")
+      getRelativeMustacheFilePathFromTemplatesPath(file.path, templatesDir.path, PdfViewerSettings.instance.customMustacheSuffix)
     )
   }
 

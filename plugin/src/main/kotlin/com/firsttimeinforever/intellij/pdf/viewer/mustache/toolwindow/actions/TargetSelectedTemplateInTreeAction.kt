@@ -23,14 +23,14 @@ class TargetSelectedTemplateInTreeAction : MustacheAction() {
       val selectedNodes = mutableListOf<MustacheTreeNode>()
 
       if (tree.rowCount > 0
-        && ((tree.getPathForRow(0).lastPathComponent as MustacheTreeNode).userObject as Structure).name() == mustacheContext.relativeFilePath
+        && ((tree.getPathForRow(0).lastPathComponent as MustacheTreeNode).userObject as Structure).normalizedName() == mustacheContext.relativeFilePath
       ) {
         selectedNodes.add(tree.getPathForRow(0).lastPathComponent as MustacheTreeNode)
       } else {
         for (i in 1 until tree.rowCount) {
           val node = tree.getPathForRow(i).lastPathComponent as MustacheTreeNode
           val nodeStructure = node.userObject as Structure
-          if (nodeStructure.name() == mustacheContext.relativeFilePath && nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT) {
+          if (nodeStructure.normalizedName() == mustacheContext.relativeFilePath && nodeStructure.segType() == SEG_TYPE.INCLUDED_TEMPLATE_SEGMENT) {
             selectedNodes.add(node)
           }
         }
