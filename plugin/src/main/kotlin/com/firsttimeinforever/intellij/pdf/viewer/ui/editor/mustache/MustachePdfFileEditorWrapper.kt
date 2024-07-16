@@ -16,7 +16,6 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableSet
 import javax.swing.DefaultSingleSelectionModel
 import javax.swing.JComponent
-import kotlin.io.path.absolutePathString
 
 class MustachePdfFileEditorWrapper(
   private val project: Project, private val mustacheFile: VirtualFile
@@ -30,7 +29,7 @@ class MustachePdfFileEditorWrapper(
     Disposer.register(this, messageBusConnection)
     val mustacheContext = project.getService(MustacheContextService::class.java).getContext(mustacheFile)
     val mustacheIncludeProcessor = mustacheContext.mustacheIncludeProcessor
-    mustacheIncludeProcessor.getRootsForMustache(mustacheFile.toNioPath().absolutePathString()).forEach { addPdfFileEditorTab(it, mustacheIncludeProcessor) }
+    mustacheIncludeProcessor.getRootsForMustache(mustacheFile.path).forEach { addPdfFileEditorTab(it, mustacheIncludeProcessor) }
     messageBusConnection.subscribe(
       MustacheUpdatePdfFileEditorTabs.TOPIC,
       MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs() }
@@ -47,7 +46,7 @@ class MustachePdfFileEditorWrapper(
 
   private fun updatePdfFileEditorTabs() {
     val mustacheIncludeProcessor = project.getService(MustacheContextService::class.java).getContext(mustacheFile).mustacheIncludeProcessor
-    val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile.toNioPath().absolutePathString())
+    val updatedRoots = mustacheIncludeProcessor.getRootsForMustache(mustacheFile.path)
     val syncedTabbedRootNames = _syncedTabbedEditors.map { it.rootName }.toImmutableList()
 
     val livingRoots = syncedTabbedRootNames.intersect(updatedRoots)

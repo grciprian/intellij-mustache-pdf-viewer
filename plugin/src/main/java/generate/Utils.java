@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 
+import static com.intellij.openapi.vfs.VfsUtilCore.VFS_SEPARATOR_CHAR;
 import static java.util.Collections.EMPTY_MAP;
 
 public class Utils {
@@ -29,10 +30,6 @@ public class Utils {
     return templatesFolder;
   }
 
-  public static boolean isFilePathUnderTemplatesPath(String filePath, String templatesPath) {
-    return filePath.startsWith(templatesPath + "\\");
-  }
-
   public static String getRelativeMustacheFilePathFromTemplatesPath(String filePath, String templatesPath, String mustacheSuffix) {
     var extensionPointIndex = StringUtilRt.lastIndexOf(filePath, '.', 0, filePath.length());
     if (extensionPointIndex < 0) return null;
@@ -45,9 +42,9 @@ public class Utils {
     try {
       var rootOutputPath = Path.of(MUSTACHE_TEMPORARY_DIRECTORY);
       if (Files.notExists(rootOutputPath)) Files.createDirectory(rootOutputPath);
-      var moduleOutputPath = Path.of("%s\\%s".formatted(MUSTACHE_TEMPORARY_DIRECTORY, moduleName));
+      var moduleOutputPath = Path.of("%s/%s".formatted(MUSTACHE_TEMPORARY_DIRECTORY, moduleName));
       if (Files.notExists(moduleOutputPath)) Files.createDirectory(moduleOutputPath);
-      var fileOutputPath = Path.of("%s\\%s\\%s.%s".formatted(MUSTACHE_TEMPORARY_DIRECTORY, moduleName, relativeFilePath.replace('\\', '_'), MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)); // mtf MustacheTemporaryFile
+      var fileOutputPath = Path.of("%s/%s/%s.%s".formatted(MUSTACHE_TEMPORARY_DIRECTORY, moduleName, relativeFilePath.replace(VFS_SEPARATOR_CHAR, '_'), MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)); // mtf MustacheTemporaryFile
       if (Files.notExists(fileOutputPath)) Files.createFile(fileOutputPath);
       var pdfContent = PdfGenerationService.getInstance(templatesPath, mustacheSuffix).generatePdf(EMPTY_MAP, relativeFilePath);
       Files.write(fileOutputPath, pdfContent.byteArray());

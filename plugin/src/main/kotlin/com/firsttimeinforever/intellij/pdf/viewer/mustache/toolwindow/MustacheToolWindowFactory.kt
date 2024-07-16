@@ -13,6 +13,7 @@ import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.Pair
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
@@ -101,10 +102,9 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
     private fun createTree(root: String, structures: List<Structure>, selectedNodeName: String?): JTree {
       val rootStructure = Structure.createRoot(root, structures)
-      val normalize = { t: String -> Path.of(t).toString().replace(Regex("\\\\"), "/") }
-      val nr = normalize(root)
+      val nr = FileUtil.normalize(root)
       rootStructure.customToString = Optional.ofNullable(selectedNodeName).map { v ->
-        val nv = normalize(v)
+        val nv = FileUtil.normalize(v)
         "/$nv @ /$nr"
       }.orElse(root)
       val rootNode = MustacheTreeNode(rootStructure)
@@ -121,7 +121,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
       buildTreeNodesFromStructures(rootNode, visitor)
       val tree = Tree(DefaultTreeModel(rootNode))
-      tree.addMouseListener(TreeMouseListener(project, _mustacheContext.templatesPath, _mustacheContext.mustacheSuffix) {
+      tree.addMouseListener(TreeMouseListener(project, _mustacheContext.templatesDir.path, _mustacheContext.mustacheSuffix) {
         _clickedNode = it
       })
 

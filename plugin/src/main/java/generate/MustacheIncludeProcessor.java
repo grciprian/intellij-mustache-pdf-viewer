@@ -76,7 +76,7 @@ public class MustacheIncludeProcessor {
       if (mustacheFile.isDirectory()) {
         return true;
       }
-      var relativePath = getRelativeMustacheFilePathFromTemplatesPath(mustacheFile.toNioPath().toFile().getAbsolutePath(), templatesPath, mustacheSuffix);
+      var relativePath = getRelativeMustacheFilePathFromTemplatesPath(mustacheFile.getPath(), templatesPath, mustacheSuffix);
       if (relativePath == null) return true;
 
       if (!includePropsMap.containsKey(relativePath)) {
@@ -129,7 +129,6 @@ public class MustacheIncludeProcessor {
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
       .orElse(Set.of());
-//      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getAbsolutePath()));
   }
 
   public Set<String> getRootsForMustache(String filePath) {
@@ -138,7 +137,6 @@ public class MustacheIncludeProcessor {
       .filter(e -> e.getKey().equals(relativePath)).findAny()
       .map(v -> v.getValue().getRoots())
       .orElse(Set.of());
-//      .orElseThrow(() -> new RuntimeException("Include map corrupted for " + file.getAbsolutePath()));
   }
 
   public void invalidateRootPdfs() {
@@ -169,7 +167,7 @@ public class MustacheIncludeProcessor {
   public String getMustacheRootForPdfFile(VirtualFile pdfFile) throws RuntimeException {
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
-      .filter(entry -> Objects.equals(entry.getValue().pdf.file().toNioPath().toFile().getAbsolutePath(), pdfFile.toNioPath().toFile().getAbsolutePath()))
+      .filter(entry -> Objects.equals(entry.getValue().pdf.file().getPath(), pdfFile.getPath()))
       .findAny()
       .map(Map.Entry::getKey)
       .orElseGet(() -> null);

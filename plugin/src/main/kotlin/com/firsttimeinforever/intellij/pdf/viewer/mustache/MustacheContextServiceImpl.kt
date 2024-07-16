@@ -27,10 +27,8 @@ import com.intellij.openapi.vfs.newvfs.events.*
 import com.intellij.openapi.wm.ToolWindowManager
 import generate.MustacheIncludeProcessor
 import generate.Utils.*
-import io.sentry.util.Objects
 import org.apache.commons.io.FileUtils
 import java.nio.file.Path
-import kotlin.io.path.absolutePathString
 
 @Service(Service.Level.PROJECT)
 class MustacheContextServiceImpl(private val project: Project) : MustacheContextService, Disposable {
@@ -75,7 +73,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       ) { _, _ -> PdfViewerSettings.instance.notifyMustacheFontsPathSettingsListeners() }
       moduleMustacheContextCache.values.forEach {
         watchPath(
-          it.templatesPath, events
+          it.templatesDir.path, events
         ) { file, event ->
           logger.debug("Target file ${file?.path} changed. Reloading current view.")
           file ?: return@watchPath
@@ -111,20 +109,15 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
             if (event.e is VFileMoveEvent) event.e.oldPath else if (event.e is VFilePropertyChangeEvent) event.e.oldPath else null
           if (eOldPath != null) {
             oldRootsFilePath = if (rootDir != null) {
-              // TODO here first treat path
-              val absoluteFilePath = f.toNioPath().absolutePathString()
-              val absoluteRootPath = rootDir.toNioPath().absolutePathString()
-              Objects.requireNonNull(absoluteFilePath, "absoluteFilePath of child file must not be null")
-              Objects.requireNonNull(absoluteRootPath, "absoluteRootPath must not be null")
-              val relativePathFromDirRootToFile = absoluteFilePath.substring(absoluteRootPath.length + 1)
-              Path.of(eOldPath).absolutePathString() + "\\" + relativePathFromDirRootToFile
+              val relativePathFromDirRootToFile = VfsUtil.getRelativePath(f, rootDir)
+              "$eOldPath/$relativePathFromDirRootToFile"
             } else {
-              Path.of(eOldPath).absolutePathString()
+              eOldPath
             }
           }
         }
         val oldMustacheFileRoots = mustacheIncludeProcessor.getOldRootsForMustache(oldRootsFilePath)
-        val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(f.toNioPath().absolutePathString())
+        val updatedMustacheFileRoots = mustacheIncludeProcessor.getRootsForMustache(f.path)
         needUpdateMustacheFileRoots.addAll(oldMustacheFileRoots)
         needUpdateMustacheFileRoots.addAll(updatedMustacheFileRoots)
       }
@@ -168,7 +161,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         FileEditorManager.getInstance(project).closeFile(it)
         FileEditorManager.getInstance(project).openTextEditor(
           OpenFileDescriptor(project, it),
-          selectedEditorFile?.toNioPath()?.absolutePathString()?.equals(it.toNioPath().absolutePathString()) == true
+          selectedEditorFile?.path.equals(it.path)
         )
       }
       // https://intellij-support.jetbrains.com/hc/en-us/community/posts/206122419-Opening-file-in-editor-without-moving-focus-to-it
@@ -222,7 +215,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         .filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
         .map { ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).syncedTabbedEditors }.flatten()
         .groupBy({
-          getModuleDirPath(it.file)
+          getModulePath(it.file)
         }, {
           it.rootName
         })
@@ -284,11 +277,11 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     }
   }
 
-  private fun getModuleDirPath(file: VirtualFile): String {
+  private fun getModulePath(file: VirtualFile): String {
     val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
     val moduleDir =
-      module?.guessModuleDir() ?: throw RuntimeException("Could not guess module dir for file: " + file.toNioPath().absolutePathString())
-    return moduleDir.toNioPath().absolutePathString()
+      module?.guessModuleDir() ?: throw RuntimeException("Could not guess module dir for file: " + file.path)
+    return moduleDir.path
   }
 
   override fun getContext(file: VirtualFile): MustacheContext {
@@ -307,12 +300,11 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     }
 
     val modulePath = moduleDir.path
-    val templatesPath = templatesDir.path
 
     val internal = if (moduleMustacheContextCache[modulePath] == null) {
       val context = MustacheContextInternal(
-        MustacheIncludeProcessor.getInstance(templatesPath, PdfViewerSettings.instance.customMustacheSuffix, module.name),
-        templatesPath,
+        MustacheIncludeProcessor.getInstance(templatesDir.path, PdfViewerSettings.instance.customMustacheSuffix, module.name),
+        templatesDir,
         PdfViewerSettings.instance.customMustachePrefix,
         PdfViewerSettings.instance.customMustacheSuffix
       )
@@ -415,7 +407,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
   data class MustacheContextInternal(
     val mustacheIncludeProcessor: MustacheIncludeProcessor,
-    val templatesPath: String,
+    val templatesDir: VirtualFile,
     val mustachePrefix: String,
     val mustacheSuffix: String
   )
@@ -423,7 +415,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
 data class MustacheContext(
   val mustacheIncludeProcessor: MustacheIncludeProcessor,
-  val templatesPath: String,
+  val templatesDir: VirtualFile,
   val mustachePrefix: String,
   val mustacheSuffix: String,
   val relativeFilePath: String
@@ -431,5 +423,5 @@ data class MustacheContext(
   constructor(
     internal: MustacheContextServiceImpl.MustacheContextInternal,
     relativeFilePath: String
-  ) : this(internal.mustacheIncludeProcessor, internal.templatesPath, internal.mustachePrefix, internal.mustacheSuffix, relativeFilePath)
+  ) : this(internal.mustacheIncludeProcessor, internal.templatesDir, internal.mustachePrefix, internal.mustacheSuffix, relativeFilePath)
 }
