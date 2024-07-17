@@ -27,8 +27,10 @@ import com.intellij.openapi.vfs.newvfs.events.*
 import com.intellij.openapi.wm.ToolWindowManager
 import generate.MustacheIncludeProcessor
 import generate.Utils.*
+import kotlinx.collections.immutable.toImmutableSet
 import org.apache.commons.io.FileUtils
 import java.nio.file.Path
+import java.util.*
 
 @Service(Service.Level.PROJECT)
 class MustacheContextServiceImpl(private val project: Project) : MustacheContextService, Disposable {
@@ -140,7 +142,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           .contains(watcherFileEventType)
       ) return
 
-      val selectedEditorFile = FileEditorManager.getInstance(project).selectedEditor?.file
       val switchEditorFiles = HashSet<VirtualFile>()
       fun pushToSwitchEditor(it: VirtualFile) {
         if (!FileEditorManager.getInstance(project).isFileOpen(it)) return
@@ -157,6 +158,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         pushToSwitchEditor(file)
       }
 
+      val selectedEditorFile = FileEditorManager.getInstance(project).selectedEditor?.file
       switchEditorFiles.forEach {
         FileEditorManager.getInstance(project).closeFile(it)
         FileEditorManager.getInstance(project).openTextEditor(
@@ -213,16 +215,16 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     override fun fontsPathChanged(settings: PdfViewerSettings) {
       FileEditorManager.getInstance(project).allEditors.asSequence()
         .filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
-        .map { ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).syncedTabbedEditors }.flatten()
+        .map { Pair(it.file, ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).syncedTabbedEditors) }
         .groupBy({
-          getModulePath(it.file)
+          getModuleInfo(project, it.first).dir.path
         }, {
-          it.rootName
+          it.second.map { v -> v.rootName }
         })
         .forEach { (modulePath, rootNames) ->
+          val rootNamesSet = rootNames.flatten().toSet()
           val mustacheContext =
             moduleMustacheContextCache[modulePath] ?: throw RuntimeException("MustacheContext not found for roots: $rootNames")
-          val rootNamesSet = rootNames.toSet()
           val mustacheIncludeProcessor = mustacheContext.mustacheIncludeProcessor
           mustacheIncludeProcessor.invalidateRootPdfsForMustacheRoots(rootNamesSet)
           rootNamesSet.forEach { mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
@@ -233,92 +235,95 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
   private inner class MyPdfViewerMustacheFilePropsSettingsListener : PdfViewerMustacheFilePropsSettingsListener {
     override fun filePropsChanged(settings: PdfViewerSettings) {
-      // get editors for all files under old templates folder and under the new templates folder
-//      val beforeModMustacheEditorsFiles =
-//        FileEditorManager.getInstance(project).allEditors.filter { isFilePathUnderTemplatesPath(it.file.absolutePath, _templatesPath) }
-//          .map { it.file }
-//          .toImmutableSet()
-//      val mustacheEditorsFiles =
-//        FileEditorManager.getInstance(project).allEditors.filter { isFilePathUnderTemplatesPath(it.file.absolutePath, _templatesPath) }
-//          .map { it.file }
-//          .toImmutableSet()
-//      val mustacheEditorsFiles = beforeModMustacheEditorsFiles.plus(afterModMustacheEditorsFiles)
-//
-//      // if the editor array is empty then we have nothing to worry about
-//      if (mustacheEditorsFiles.isEmpty()) return
-//
-//      // if we now have an editor open for the new templates folder then we can recalculate TEMPLATES_PATH for specialized mustache editors to open
-//      Optional.ofNullable(afterModMustacheEditorsFiles.firstOrNull())
-//        .ifPresentOrElse(
-//          { _templatesPath = getTemplatesPath(modulePath, PdfViewerSettings.instance.customMustachePrefix) },
-//          {
-//            println("FilePropsChanged: Not editor open so the TEMPLATES_PATH haven't have to be modified right now. It would be updated on the next valid opened mustache.")
-//            _templatesPath = null.toString()
-//          })
-//
-//      // reprocess include dependency tree for mustache files under the new templates folder
-//      _mustacheIncludeProcessor.processFileIncludePropsMap()
-//      _mustacheIncludeProcessor.invalidateRootPdfs()
-//
-//      // we save the selected editor's file for it to be reselected after editors switch
-//      val selectedEditorFile = FileEditorManager.getInstance(project).selectedEditor?.file
-//      // we should close the editors and reopen them accordingly
-//      mustacheEditorsFiles.forEach {
-//        FileEditorManager.getInstance(project).closeFile(it)
-//        FileEditorManager.getInstance(project).openTextEditor(
-//          OpenFileDescriptor(project, it),
-//          selectedEditorFile?.absolutePath?.equals(it.absolutePath) == true
-//        )
-//      }
-//      // https://intellij-support.jetbrains.com/hc/en-us/community/posts/206122419-Opening-file-in-editor-without-moving-focus-to-it
-//      // a lil bit tricky, has a weird behaviour on tab selection? but it works
-//      if (selectedEditorFile != null) FileEditorManager.getInstance(project)
-//        .openTextEditor(OpenFileDescriptor(project, selectedEditorFile), true)
-    }
-  }
+      val getEditorFiles = {
+        FileEditorManager.getInstance(project).allEditors
+          .filter {
+            val mustacheContext = moduleMustacheContextCache[getModuleInfo(project, it.file).dir.path]
+              ?: throw RuntimeException("Could not get mustacheContext for file: " + it.file.path)
+            return@filter VfsUtil.isUnder(
+              it.file,
+              setOf(mustacheContext.templatesDir)
+            ) && it.file.extension == mustacheContext.mustacheSuffix
+          }
+          .map { it.file }
+          .toImmutableSet()
+      }
+      // get editors for all files under old templates folder
+      val beforeModMustacheEditorsFiles = getEditorFiles()
+      // now change props from settings
+      FileEditorManager.getInstance(project).allEditors
+        .groupBy {
+          getModuleInfo(project, it.file)
+        }
+        .keys
+        .forEach {
+          val templatesDir = getTemplatesDir(it.dir, settings.customMustachePrefix)
+          moduleMustacheContextCache[it.dir.path] = MustacheContextInternal(
+            MustacheIncludeProcessor.getInstance(templatesDir.path, settings.customMustacheSuffix, it.name),
+            templatesDir,
+            settings.customMustacheSuffix
+          )
+        }
+      // get editors for all files under the new templates folder
+      val afterModMustacheEditorsFiles = getEditorFiles()
+      val mustacheEditorsFiles = beforeModMustacheEditorsFiles.plus(afterModMustacheEditorsFiles)
 
-  private fun getModulePath(file: VirtualFile): String {
-    val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
-    val moduleDir =
-      module?.guessModuleDir() ?: throw RuntimeException("Could not guess module dir for file: " + file.path)
-    return moduleDir.path
+      // if the editor array is empty then we have nothing to worry about
+      if (mustacheEditorsFiles.isEmpty()) return
+
+      // reprocess include dependency tree for mustache files under the new templates folder
+      moduleMustacheContextCache.values.forEach {
+        it.mustacheIncludeProcessor.processFileIncludePropsMap()
+        it.mustacheIncludeProcessor.invalidateRootPdfs()
+      }
+
+      // we save the selected editor's file for it to be reselected after editors switch
+      val selectedEditorFile = FileEditorManager.getInstance(project).selectedEditor?.file
+      // we should close the editors and reopen them accordingly
+      mustacheEditorsFiles.forEach {
+        FileEditorManager.getInstance(project).closeFile(it)
+        FileEditorManager.getInstance(project).openTextEditor(
+          OpenFileDescriptor(project, it),
+          selectedEditorFile?.path.equals(it.path)
+        )
+      }
+      // https://intellij-support.jetbrains.com/hc/en-us/community/posts/206122419-Opening-file-in-editor-without-moving-focus-to-it
+      // a lil bit tricky, has a weird behaviour on tab selection? but it works
+      if (selectedEditorFile != null) FileEditorManager.getInstance(project)
+        .openTextEditor(OpenFileDescriptor(project, selectedEditorFile), true)
+    }
   }
 
   override fun getContext(file: VirtualFile): MustacheContext {
-    if (file.extension != PdfViewerSettings.instance.customMustacheSuffix) throw RuntimeException("File does not have a valid mustache extension")
+    val moduleInfo = getModuleInfo(project, file)
 
-    val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
-      ?: throw RuntimeException("Could not get module for file ${file.path}")
-    val moduleDir = module.guessModuleDir()
-      ?: throw RuntimeException("Could not get moduleDir for file ${file.path}")
-
-    val templatesDir = getTemplatesDir(moduleDir, PdfViewerSettings.instance.customMustachePrefix)
-    if(!VfsUtil.isUnder(file, setOf(templatesDir))) {
-      throw RuntimeException(
-        "File is not under templates folder [templatesPath, filePath] [${templatesDir.path}, ${file.path}]"
-      )
-    }
-
-    val modulePath = moduleDir.path
-
-    val internal = if (moduleMustacheContextCache[modulePath] == null) {
+    val internal = if (moduleMustacheContextCache[moduleInfo.dir.path] == null) {
+      val templatesDir = getTemplatesDir(moduleInfo.dir, PdfViewerSettings.instance.customMustachePrefix)
       val context = MustacheContextInternal(
-        MustacheIncludeProcessor.getInstance(templatesDir.path, PdfViewerSettings.instance.customMustacheSuffix, module.name),
+        MustacheIncludeProcessor.getInstance(templatesDir.path, PdfViewerSettings.instance.customMustacheSuffix, moduleInfo.name),
         templatesDir,
-        PdfViewerSettings.instance.customMustachePrefix,
         PdfViewerSettings.instance.customMustacheSuffix
       )
-      moduleMustacheContextCache[modulePath] = context
-      logger.debug("Initializing and caching mustache context for module... " + module.name)
+      moduleMustacheContextCache[moduleInfo.dir.path] = context
+      logger.debug("Initializing and caching mustache context for module... " + moduleInfo.name)
       context
     } else {
-      logger.debug("Retrieving from cache mustache context for module... " + module.name)
-      moduleMustacheContextCache[modulePath]!!
+      logger.debug("Retrieving from cache mustache context for module... " + moduleInfo.name)
+      moduleMustacheContextCache[moduleInfo.dir.path]!!
+    }
+
+    if (file.extension != internal.mustacheSuffix) {
+      throw RuntimeException("File does not have a valid mustache extension")
+    }
+    if (!VfsUtil.isUnder(file, setOf(internal.templatesDir))) {
+      throw RuntimeException(
+        "File is not under templates folder [templatesPath, filePath] [${internal.templatesDir.path}, ${file.path}]"
+      )
     }
 
     return MustacheContext(
       internal,
-      getRelativeMustacheFilePathFromTemplatesPath(file.path, templatesDir.path, PdfViewerSettings.instance.customMustacheSuffix)
+      getRelativeMustacheFilePathFromTemplatesPath(file.path, internal.templatesDir.path, internal.mustacheSuffix)
     )
   }
 
@@ -339,6 +344,19 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     private fun interface FileWatcher {
       fun run(file: VirtualFile?, event: WatcherFileEvent)
+    }
+
+    data class ModuleInfo(
+      val name: String,
+      val dir: VirtualFile
+    )
+
+    fun getModuleInfo(project: Project, file: VirtualFile): ModuleInfo {
+      val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
+        ?: throw RuntimeException("Could not get module for file ${file.path}")
+      val moduleDir = module.guessModuleDir()
+        ?: throw RuntimeException("Could not get moduleDir for file ${file.path}")
+      return ModuleInfo(module.name, moduleDir)
     }
 
     private fun watchPath(watchedPath: String, events: MutableList<out VFileEvent>, fileWatcher: FileWatcher) {
@@ -408,7 +426,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   data class MustacheContextInternal(
     val mustacheIncludeProcessor: MustacheIncludeProcessor,
     val templatesDir: VirtualFile,
-    val mustachePrefix: String,
     val mustacheSuffix: String
   )
 }
@@ -416,12 +433,11 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 data class MustacheContext(
   val mustacheIncludeProcessor: MustacheIncludeProcessor,
   val templatesDir: VirtualFile,
-  val mustachePrefix: String,
   val mustacheSuffix: String,
   val relativeFilePath: String
 ) {
   constructor(
     internal: MustacheContextServiceImpl.MustacheContextInternal,
     relativeFilePath: String
-  ) : this(internal.mustacheIncludeProcessor, internal.templatesDir, internal.mustachePrefix, internal.mustacheSuffix, relativeFilePath)
+  ) : this(internal.mustacheIncludeProcessor, internal.templatesDir, internal.mustacheSuffix, relativeFilePath)
 }
