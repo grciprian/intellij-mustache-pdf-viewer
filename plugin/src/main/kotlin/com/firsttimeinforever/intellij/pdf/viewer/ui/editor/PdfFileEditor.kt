@@ -24,6 +24,8 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
   private val messageBusConnection = project.messageBus.connect()
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
   private lateinit var mustacheIncludeProcessor: MustacheIncludeProcessor
+  var isFocused = false
+  var needsReload = false
   private var _rootName: String = null.toString()
   val rootName: String
     get() = _rootName
@@ -50,13 +52,21 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
         val pdfMustacheRoot = mustacheIncludeProcessor.getMustacheRootForPdfFile(pdfFile) ?: return@MustacheRefreshPdfFileEditorTabs
         if (!it.contains(pdfMustacheRoot)) return@MustacheRefreshPdfFileEditorTabs
 
-        if (viewComponent.controller == null) {
-          logger.warn("FileChangedListener was called for view with controller == null!")
-        } else {
-          logger.debug("Target file ${pdfFile.path} changed. Reloading current view.")
-          viewComponent.controller.reload(tryToPreserveState = true)
+        needsReload = true
+        if (isFocused) {
+          reload()
         }
       })
+  }
+
+  fun reload() {
+    if (needsReload) needsReload = false else return
+    if (viewComponent.controller == null) {
+      logger.warn("FileChangedListener was called for view with controller == null!")
+    } else {
+      logger.debug("Target file ${pdfFile.path} changed. Reloading current view.")
+      viewComponent.controller.reload(tryToPreserveState = true)
+    }
   }
 
   override fun getName(): String = NAME

@@ -90,7 +90,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     ) {
       mustacheIncludeProcessor.processFileIncludePropsMap()
       invalidateRoots(file, event, mustacheIncludeProcessor)
-      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs()
+      project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs(file)
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
     }
 
