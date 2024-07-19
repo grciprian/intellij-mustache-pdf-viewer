@@ -39,9 +39,9 @@ class MustachePdfFileEditorWrapper(
       if (source !is DefaultSingleSelectionModel) return@addChangeListener
       if (_jbTabbedPane.selectedIndex < 0 || _jbTabbedPane.selectedIndex >= _syncedTabbedEditors.size) return@addChangeListener
       val pdfFileEditor = _syncedTabbedEditors[source.selectedIndex]
-      val rootName = pdfFileEditor.rootName
+      pdfFileEditor.tryReload()
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-        .rootChanged(rootName, mustacheContext)
+        .rootChanged(pdfFileEditor.rootName, mustacheContext)
     }
   }
 

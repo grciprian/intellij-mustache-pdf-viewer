@@ -16,6 +16,7 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import generate.MustacheIncludeProcessor
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JComponent
 
 // TODO: Implement state persistence
@@ -25,7 +26,7 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
   private val fileChangedListener = FileChangedListener(PdfViewerSettings.instance.enableDocumentAutoReload)
   private lateinit var mustacheIncludeProcessor: MustacheIncludeProcessor
   var isFocused = false
-  var needsReload = false
+  var needsReload = AtomicBoolean(false)
   private var _rootName: String = null.toString()
   val rootName: String
     get() = _rootName
@@ -52,15 +53,15 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
         val pdfMustacheRoot = mustacheIncludeProcessor.getMustacheRootForPdfFile(pdfFile) ?: return@MustacheRefreshPdfFileEditorTabs
         if (!it.contains(pdfMustacheRoot)) return@MustacheRefreshPdfFileEditorTabs
 
-        needsReload = true
+        needsReload.set(true)
         if (isFocused) {
-          reload()
+          tryReload()
         }
       })
   }
 
-  fun reload() {
-    if (needsReload) needsReload = false else return
+  fun tryReload() {
+    if (needsReload.get()) needsReload.set(false) else return
     if (viewComponent.controller == null) {
       logger.warn("FileChangedListener was called for view with controller == null!")
     } else {
@@ -98,6 +99,8 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
 
   override fun dispose() {
     super.dispose()
+    isFocused = false
+    needsReload.set(false)
     messageBusConnection.disconnect()
     Disposer.dispose(messageBusConnection)
     Disposer.dispose(viewComponent)
