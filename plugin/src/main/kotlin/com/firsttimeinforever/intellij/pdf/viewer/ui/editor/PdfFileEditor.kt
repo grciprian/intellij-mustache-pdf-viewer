@@ -52,7 +52,6 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
         // then the mustache file that was modified impacted the pdf and it needs to be reloaded
         val pdfMustacheRoot = mustacheIncludeProcessor.getMustacheRootForPdfFile(pdfFile) ?: return@MustacheRefreshPdfFileEditorTabs
         if (!it.contains(pdfMustacheRoot)) return@MustacheRefreshPdfFileEditorTabs
-
         needsReload.set(true)
         if (isFocused) {
           tryReload()
@@ -65,6 +64,7 @@ class PdfFileEditor(project: Project, private val pdfFile: VirtualFile) : FileEd
     if (viewComponent.controller == null) {
       logger.warn("FileChangedListener was called for view with controller == null!")
     } else {
+      println("Target file ${pdfFile.path} changed. Reloading current view. Root file: ${_rootName}. PDF file: ${pdfFile.path}")
       logger.debug("Target file ${pdfFile.path} changed. Reloading current view.")
       viewComponent.controller.reload(tryToPreserveState = true)
     }

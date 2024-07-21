@@ -23,6 +23,8 @@ class MustacheFileEditor(
   private lateinit var editor: TextEditor
   private lateinit var preview: MustachePdfFileEditorWrapper
   private lateinit var _textEditorWithPreview: TextEditorWithPreview
+  val textEditorWithPreview
+    get() = _textEditorWithPreview
 
   private fun createEditorBuilder(): AsyncFileEditorProvider.Builder {
     if (provider is AsyncFileEditorProvider) {
@@ -37,12 +39,12 @@ class MustacheFileEditor(
     }
   }
 
-  val textEditorWithPreview: () -> AsyncFileEditorProvider.Builder
+  val textEditorWithPreviewBuilder: () -> AsyncFileEditorProvider.Builder
     get() = {
       object : AsyncFileEditorProvider.Builder() {
         override fun build(): FileEditor {
           editor = createEditorBuilder().build() as TextEditor
-          preview = MustachePdfFileEditorWrapper(project, virtualFile)
+          preview = MustachePdfFileEditorWrapper(this@MustacheFileEditor, project, virtualFile)
           _textEditorWithPreview = TextEditorWithPreview(
             editor, preview, NAME, TextEditorWithPreview.Layout.SHOW_EDITOR_AND_PREVIEW, !PdfViewerSettings.instance.isVerticalSplit
           )

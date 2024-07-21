@@ -54,7 +54,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
             val context = project.getService(MustacheContextService::class.java).getContext(file)
             context.mustacheIncludeProcessor.processFileIncludePropsMap()
             mustacheFileEditor = MustacheFileEditor(project, file)
-            return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreview().build()
+            return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreviewBuilder().build()
           }
         } catch (e: RuntimeException) {
           // file was not mustache context valid

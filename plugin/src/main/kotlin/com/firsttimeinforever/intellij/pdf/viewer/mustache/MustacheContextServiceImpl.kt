@@ -91,6 +91,11 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       mustacheIncludeProcessor.processFileIncludePropsMap()
       invalidateRoots(file, event, mustacheIncludeProcessor)
       project.messageBus.syncPublisher(MustacheUpdatePdfFileEditorTabs.TOPIC).updateTabs(file)
+      val aliveRootNamesThatNeedUpdate = FileEditorManager.getInstance(project).allEditors.asSequence()
+        .filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
+        .map { ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).getAliveRootNamesThatNeedUpdateAndRelease }
+        .flatten().toSet()
+      project.messageBus.syncPublisher(MustacheRefreshPdfFileEditorTabs.TOPIC).refreshTabs(aliveRootNamesThatNeedUpdate)
       project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC).refresh()
     }
 
@@ -187,6 +192,9 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     private fun manageMustacheFileEditors(selectedEditor: TextEditorWithPreview?) {
       //TODO: poate un mecanism prin care tabul selectat al unui editor selectat sa faca refresh doar in cazul in care este selectat
+      // one month later, here it is
+      selectedEditor ?: return
+      (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTab?.tryReload()
     }
 
     private fun manageMustacheToolWindow(selectedEditor: TextEditorWithPreview?) {
@@ -198,7 +206,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           toolWindow?.setAvailable(true, null)
           toolWindow?.show()
         }
-        root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTabRoot ?: return
+        root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTab?.rootName ?: return
         ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
           .rootChanged(root, getContext(selectedEditor.file!!))
       }
