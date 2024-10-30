@@ -45,7 +45,7 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
             else -> "Outline (document structure)"
           }
         }
-        comboBox(DefaultComboBoxModel(SidebarViewMode.values()), renderer)
+        comboBox(DefaultComboBoxModel(SidebarViewMode.entries.toTypedArray()), renderer)
           .bindItem(defaultSidebarViewMode)
       }
     }

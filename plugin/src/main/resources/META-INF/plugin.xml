@@ -7,6 +7,7 @@
 
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true" config-file="texify-idea.xml">nl.rubensten.texifyidea</depends>
+  <depends optional="true" config-file="cwm.xml">com.intellij.jetbrains.client</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <fileType name="PDF"
@@ -24,9 +25,10 @@
     <registryKey defaultValue="true" key="pdf.viewer.use.jcef.osr.view" description="Enables JCEF off-screen rendering"/>
 
     <applicationService serviceImplementation="com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings"/>
-    <projectConfigurable instance="com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerConfigurable"/>
+    <applicationConfigurable instance="com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerConfigurable" displayName="PDF Viewer"/>
+<!--    <projectConfigurable instance="com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerConfigurable"/>-->
     <errorHandler implementation="com.firsttimeinforever.intellij.pdf.viewer.report.PdfErrorReportSubmitter"/>
-    <statusBarWidgetFactory id="com.firsttimeinforever.intellij.pdf.viewer.ui.widgets.PdfDocumentPageStatusBarWidget"
+    <statusBarWidgetFactory id="PdfViewer.DocumentPageStatusBarWidget"
                             implementation="com.firsttimeinforever.intellij.pdf.viewer.ui.widgets.PdfDocumentPageStatusBarWidgetFactory"/>
 
     <toolWindow id="Mustache" anchor="right"

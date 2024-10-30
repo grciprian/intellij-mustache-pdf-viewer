@@ -23,6 +23,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   override fun getEditorTypeId() = PDF
 
   override fun accept(project: Project, file: VirtualFile): Boolean {
+    logger.debug("check accept, file: $file")
     if (file.fileType == PdfFileType) return true
     try {
       // try to get mustache context for a possible valid file

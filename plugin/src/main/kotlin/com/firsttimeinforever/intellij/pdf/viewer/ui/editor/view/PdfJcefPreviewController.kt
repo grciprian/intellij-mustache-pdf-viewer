@@ -31,7 +31,15 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.jcef.JCEFHtmlPanel
 import com.intellij.util.ui.UIUtil
+import io.netty.handler.codec.http.QueryStringDecoder
+import kotlinx.serialization.json.JsonElement
+import org.cef.browser.CefBrowser
+import org.cef.browser.CefFrame
+import org.cef.callback.CefContextMenuParams
+import org.cef.callback.CefMenuModel
+import org.cef.handler.CefContextMenuHandlerAdapter
 import java.awt.Color
+import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
 class PdfJcefPreviewController(val project: Project, val virtualFile: VirtualFile) :
@@ -78,12 +86,35 @@ class PdfJcefPreviewController(val project: Project, val virtualFile: VirtualFil
       browser.addConsoleMessageListener(createDefaultConsoleMessageListener(logger))
     }
 
+    browser.jbCefClient.addContextMenuHandler(object : CefContextMenuHandlerAdapter() {
+      private fun getPdfUrl(cefBrowser: CefBrowser?): String? {
+        if (!viewLoaded || cefBrowser == null) return null
+        val urlDecoder = QueryStringDecoder(cefBrowser.url)
+        val file = urlDecoder.parameters()?.get("file")?.get(0) ?: return null
+        return URL(URL(cefBrowser.url), file).toString()
+      }
+
+      override fun onBeforeContextMenu(cefBrowser: CefBrowser?, frame: CefFrame?, params: CefContextMenuParams?, model: CefMenuModel?) {
+        getPdfUrl(cefBrowser) ?: return
+        model?.addItem(CefMenuModel.MenuId.MENU_ID_USER_FIRST, "Open in Embedded Browser")
+      }
+
+      override fun onContextMenuCommand(cefBrowser: CefBrowser?, frame: CefFrame?, params: CefContextMenuParams?, commandId: Int, eventFlags: Int): Boolean {
+        if (commandId != CefMenuModel.MenuId.MENU_ID_USER_FIRST) return false
+        val url = getPdfUrl(cefBrowser) ?: return true
+        logger.debug("would load pdf, base url: ${cefBrowser?.url}, pdf url: $url")
+        viewLoaded = false
+        browser.loadURL(url)
+        return true
+      }
+    }, browser.cefBrowser)
+
     pipe.subscribe<BrowserMessages.InitialViewProperties> {
       logger.debug(it.toString())
       viewProperties = it.properties
       // TODO: Move to dedicated in-memory stylesheet and serve it as a resource
       updateViewTheme(collectThemeColors())
-      pipe.send(IdeMessages.SynctexAvailability(virtualFile.isSynctexFileAvailable() && isSynctexInstalled()))
+      pipe.send(IdeMessages.SynctexAvailability(virtualFile.parent != null && virtualFile.isSynctexFileAvailable() && isSynctexInstalled()))
       viewLoaded = true
       firstLoad = false
     }
@@ -130,7 +161,7 @@ class PdfJcefPreviewController(val project: Project, val virtualFile: VirtualFil
   private fun doActualReload(tryToPreserveState: Boolean = false) {
     viewLoaded = false
     try {
-      val base = PdfStaticServer.instance.getPreviewUrl(virtualFile.path, withReloadSalt = true)
+      val base = PdfStaticServer.instance.getPreviewUrl(virtualFile, withReloadSalt = true)
       if (firstLoad) {
         viewState = viewState.copy(sidebarViewMode = PdfViewerSettings.instance.defaultSidebarViewMode)
       }
@@ -248,7 +279,7 @@ class PdfJcefPreviewController(val project: Project, val virtualFile: VirtualFil
 
   fun canNavigate(): Boolean = outline != null
 
-  fun navigate(destinationReference: String) {
+  fun navigate(destinationReference: JsonElement) {
     pipe.send(IdeMessages.NavigateTo(destinationReference))
   }
 
@@ -256,7 +287,10 @@ class PdfJcefPreviewController(val project: Project, val virtualFile: VirtualFil
     pipe.send(IdeMessages.NavigateHistory(direction))
   }
 
-  override fun dispose() = Unit
+  override fun dispose() {
+    logger.debug("dispose $virtualFile")
+    PdfStaticServer.instance.disposePreviewUrl(virtualFile)
+  }
 
   companion object {
     private val logger = logger<PdfJcefPreviewController>()
