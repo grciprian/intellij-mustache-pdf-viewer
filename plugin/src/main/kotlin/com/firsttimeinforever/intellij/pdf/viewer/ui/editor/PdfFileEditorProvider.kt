@@ -4,6 +4,7 @@ import com.firsttimeinforever.intellij.pdf.viewer.lang.PdfFileType
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.MustacheContextService
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.AsyncFileEditorProvider
 import com.intellij.openapi.fileEditor.FileEditor
@@ -16,25 +17,12 @@ import com.intellij.openapi.vfs.VirtualFile
 
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
-  private val mainProvider: TextEditorProvider = TextEditorProvider.getInstance()
   private var pdfFileEditor: PdfFileEditor? = null
   private var mustacheFileEditor: MustacheFileEditor? = null
 
   override fun getEditorTypeId() = PDF
 
-  override fun accept(project: Project, file: VirtualFile): Boolean {
-    logger.debug("check accept, file: $file")
-    if (file.fileType == PdfFileType) return true
-    try {
-      // try to get mustache context for a possible valid file
-      project.getService(MustacheContextService::class.java).getContext(file)
-      return mainProvider.accept(project, file)
-    } catch (e: RuntimeException) {
-      // file was not mustache context valid
-      logger.error(e.message)
-      return false
-    }
-  }
+  override fun accept(project: Project, file: VirtualFile): Boolean = accept(project, file, logger)
 
   override fun createEditor(project: Project, file: VirtualFile): FileEditor {
     return createEditorAsync(project, file).build()
@@ -50,7 +38,7 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
           return pdfFileEditor as PdfFileEditor
         }
         try {
-          if (mainProvider.accept(project, file)) {
+          if (TextEditorProvider.getInstance().accept(project, file)) {
             // try to get mustache context for a possible valid file
             val context = project.getService(MustacheContextService::class.java).getContext(file)
             context.mustacheIncludeProcessor.processFileIncludePropsMap()
@@ -74,5 +62,19 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   companion object {
     private const val PDF = "PDF"
     private val logger = logger<PdfFileEditorProvider>()
+
+    fun accept(project: Project, file: VirtualFile, logger: Logger): Boolean {
+      logger.debug("check accept, file: $file")
+      if (file.fileType == PdfFileType) return true
+      try {
+        // try to get mustache context for a possible valid file
+        project.getService(MustacheContextService::class.java).getContext(file)
+        return TextEditorProvider.getInstance().accept(project, file)
+      } catch (e: RuntimeException) {
+        // file was not mustache context valid
+        logger.error(e.message)
+        return false
+      }
+    }
   }
 }

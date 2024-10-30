@@ -9,7 +9,6 @@ import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
-import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
@@ -27,11 +26,11 @@ class MustacheFileEditor(
     get() = _textEditorWithPreview
 
   private fun createEditorBuilder(): AsyncFileEditorProvider.Builder {
-    if (provider is AsyncFileEditorProvider) {
-      return runBlockingCancellable {
-        provider.createEditorAsync(project, virtualFile)
-      }
-    }
+//    if (provider is AsyncFileEditorProvider) {
+//      return runBlockingCancellable {
+//        return provider.createEditorAsync(project, virtualFile)
+//      }
+//    }
     return object : AsyncFileEditorProvider.Builder() {
       override fun build(): FileEditor {
         return provider.createEditor(project, virtualFile)
