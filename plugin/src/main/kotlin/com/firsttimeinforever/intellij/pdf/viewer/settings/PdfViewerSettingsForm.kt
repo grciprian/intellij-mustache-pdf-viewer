@@ -53,6 +53,11 @@ class PdfViewerSettingsForm(val project: Project) : JPanel() {
 
   private val mustacheSettingsGroup = panel {
     group(PdfViewerBundle.message("pdf.viewer.settings.group.mustache")) {
+// try use PathEditor
+      //      row("Templates") {
+//        val folderDescriptor = FileChooserDescriptor(false, true, false, false, false, false)
+//        PathEditor(folderDescriptor)
+//      }
       row(PdfViewerBundle.message("pdf.viewer.settings.mustache.fonts.path")) {
         val folderDescriptor = FileChooserDescriptor(false, true, false, false, false, false)
         textFieldWithBrowseButton(null, project, folderDescriptor, null)
