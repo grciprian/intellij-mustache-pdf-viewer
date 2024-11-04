@@ -25,12 +25,16 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.*
 import com.intellij.openapi.wm.ToolWindowManager
+import exceptions.FileNotUnderTemplatesFolderException
+import exceptions.FileNotValidMustacheExtensionException
+import exceptions.ModuleNotFoundException
+import exceptions.MustacheContextNotFoundException
 import generate.MustacheIncludeProcessor
 import generate.Utils.*
 import kotlinx.collections.immutable.toImmutableSet
 import org.apache.commons.io.FileUtils
+import org.apache.commons.lang3.StringUtils
 import java.nio.file.Path
-import java.util.*
 
 @Service(Service.Level.PROJECT)
 class MustacheContextServiceImpl(private val project: Project) : MustacheContextService, Disposable {
@@ -79,8 +83,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         ) { file, event ->
           logger.debug("Target file ${file?.path} changed. Reloading current view.")
           file ?: return@watchPath
-          manageMustacheProcessingForFile(file, event, it.mustacheIncludeProcessor)
           manageMustacheEditors(file, event.type)
+          manageMustacheProcessingForFile(file, event, it.mustacheIncludeProcessor)
         }
       }
     }
@@ -207,8 +211,24 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           toolWindow?.show()
         }
         root = (selectedEditor.previewEditor as MustachePdfFileEditorWrapper).activeTab?.rootName ?: return
-        ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-          .rootChanged(root, getContext(selectedEditor.file!!))
+        try {
+          ApplicationManager.getApplication().messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
+            .rootChanged(root, getContext(selectedEditor.file!!))
+        } catch (e: Exception) {
+          when (e) {
+            is FileNotValidMustacheExtensionException,
+            is FileNotUnderTemplatesFolderException -> {
+              logger.debug(
+                "In this point there is a big possibility that a mustache file editor was opened when a setting affecting it was" +
+                  "changed and the MyPdfViewerMustacheFilePropsSettingsListener that is responsible with the open/close of the editors" +
+                  "according to their validity has not been called yet. So just ignore this for the moment.",
+                e
+              )
+            }
+
+            else -> throw e
+          }
+        }
       }
       if (root == null && toolWindowInitialized) {
         toolWindowInitialized = false
@@ -232,7 +252,8 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         .forEach { (modulePath, rootNames) ->
           val rootNamesSet = rootNames.flatten().toSet()
           val mustacheContext =
-            moduleMustacheContextCache[modulePath] ?: throw RuntimeException("MustacheContext not found for roots: $rootNames")
+            moduleMustacheContextCache[modulePath]
+              ?: throw MustacheContextNotFoundException("MustacheContext not found for roots: $rootNames")
           val mustacheIncludeProcessor = mustacheContext.mustacheIncludeProcessor
           mustacheIncludeProcessor.invalidateRootPdfsForMustacheRoots(rootNamesSet)
           rootNamesSet.forEach { mustacheIncludeProcessor.processPdfFileForMustacheRoot(it) }
@@ -246,12 +267,12 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       val getEditorFiles = {
         FileEditorManager.getInstance(project).allEditors
           .filter {
-            val mustacheContext = moduleMustacheContextCache[getModuleInfo(project, it.file).dir.path]
-              ?: throw RuntimeException("Could not get mustacheContext for file: " + it.file.path)
-            return@filter VfsUtil.isUnder(
-              it.file,
-              setOf(mustacheContext.templatesDir)
-            ) && it.file.extension == mustacheContext.mustacheSuffix
+            try {
+              getContext(it.file)
+              return@filter true
+            } catch (e: Exception) {
+              return@filter false
+            }
           }
           .map { it.file }
           .toImmutableSet()
@@ -321,10 +342,10 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     }
 
     if (file.extension != internal.mustacheSuffix) {
-      throw RuntimeException("File does not have a valid mustache extension")
+      throw FileNotValidMustacheExtensionException("File does not have a valid mustache extension")
     }
     if (!VfsUtil.isUnder(file, setOf(internal.templatesDir))) {
-      throw RuntimeException(
+      throw FileNotUnderTemplatesFolderException(
         "File is not under templates folder [templatesPath, filePath] [${internal.templatesDir.path}, ${file.path}]"
       )
     }
@@ -361,13 +382,18 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
     fun getModuleInfo(project: Project, file: VirtualFile): ModuleInfo {
       val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(file)
-        ?: throw RuntimeException("Could not get module for file ${file.path}")
+        ?: throw ModuleNotFoundException("Could not get module for file ${file.path}")
       val moduleDir = module.guessModuleDir()
-        ?: throw RuntimeException("Could not get moduleDir for file ${file.path}")
+        ?: throw ModuleNotFoundException("Could not get moduleDir for file ${file.path}")
       return ModuleInfo(module.name, moduleDir)
     }
 
     private fun watchPath(watchedPath: String, events: MutableList<out VFileEvent>, fileWatcher: FileWatcher) {
+
+      if (StringUtils.isBlank(watchedPath)) {
+        logger.debug("watchedPath is either null or empty")
+        return
+      }
 
       var file: VirtualFile? = null
       var event: WatcherFileEvent? = null

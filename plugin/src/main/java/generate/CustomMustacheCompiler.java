@@ -1,6 +1,5 @@
 package generate;
 
-import com.intellij.openapi.util.Pair;
 import com.samskivert.mustache.DefaultCollector;
 import com.samskivert.mustache.Escapers;
 import com.samskivert.mustache.Mustache;
@@ -15,6 +14,8 @@ import java.util.regex.Pattern;
 
 public class CustomMustacheCompiler {
 
+  // maybe make this customizable in settings?
+  public static final int RECURSION_THRESHOLD = 500;
   private static final BiFunction<CustomMustacheCompiler.FaultyType, String, String> DO_FAULTY_HTML_MESSAGE = (type, name) ->
     "<span style=\"color: red !important;\">[" + type.name() + ">" + name + "]</span>";
   private static final String FAULTY_HTML_REGEX_MATCHER = "<span style=\"color: red !important;\">\\[FAULTY_VAR>.*?\\]<\\/span>";
@@ -24,19 +25,14 @@ public class CustomMustacheCompiler {
     }
     return Escapers.HTML.escape(text);
   };
-  // maybe make this customizable in settings?
-  private static final Long RECURSION_THRESHOLD = 500L;
-  private static Pair<String, Long> recursionCounter = Pair.empty();
+  private static final RecurringSequenceDetector detector = new RecurringSequenceDetector(RECURSION_THRESHOLD);
   private static final BiFunction<String, String, Mustache.TemplateLoader> TEMPLATE_LOADER =
     (templatesPath, mustacheSuffix) -> name -> {
-      if (!Objects.equals(name, recursionCounter.first)) {
-        recursionCounter = new Pair<>(name, 1L);
-      } else {
-        recursionCounter = new Pair<>(recursionCounter.first, recursionCounter.second + 1);
-      }
-      if (recursionCounter.second > RECURSION_THRESHOLD) {
+
+      if (detector.checkForRecursion(name)) {
         throw new RuntimeException("Recursion found for included template segment: " + name);
       }
+
       var file = new File(templatesPath, name + "." + mustacheSuffix);
       if (!file.exists()) {
         return new StringReader(DO_FAULTY_HTML_MESSAGE.apply(CustomMustacheCompiler.FaultyType.FAULTY_PARTIAL, name));

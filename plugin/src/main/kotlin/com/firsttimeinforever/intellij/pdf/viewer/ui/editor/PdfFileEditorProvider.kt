@@ -14,6 +14,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
+import exceptions.*
 
 class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
 
@@ -45,9 +46,19 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
             mustacheFileEditor = MustacheFileEditor(project, file)
             return (mustacheFileEditor as MustacheFileEditor).textEditorWithPreviewBuilder().build()
           }
-        } catch (e: RuntimeException) {
-          // file was not mustache context valid
-          logger.error(e.message)
+        } catch (e: Exception) {
+          when (e) {
+            is FileNotUnderTemplatesFolderException,
+            is FileNotValidMustacheExtensionException,
+            is ModuleNotFoundException,
+            is MustacheContextNotFoundException,
+            is TemplatesFolderNotFoundException -> {
+              // file was not mustache context valid
+              logger.debug(e.message)
+            }
+
+            else -> throw e
+          }
         }
         throw RuntimeException("Unsupported file type. It shouldn't have come to this anyway.")
       }
@@ -62,19 +73,29 @@ class PdfFileEditorProvider : AsyncFileEditorProvider, DumbAware, Disposable {
   companion object {
     private const val PDF = "PDF"
     private val logger = logger<PdfFileEditorProvider>()
+  }
+}
 
-    fun accept(project: Project, file: VirtualFile, logger: Logger): Boolean {
-      logger.debug("check accept, file: $file")
-      if (file.fileType == PdfFileType) return true
-      try {
-        // try to get mustache context for a possible valid file
-        project.getService(MustacheContextService::class.java).getContext(file)
-        return TextEditorProvider.getInstance().accept(project, file)
-      } catch (e: RuntimeException) {
+fun accept(project: Project, file: VirtualFile, logger: Logger): Boolean {
+  logger.debug("check accept, file: $file")
+  if (file.fileType == PdfFileType) return true
+  return try {
+    // try to get mustache context for a possible valid file
+    project.getService(MustacheContextService::class.java).getContext(file)
+    TextEditorProvider.getInstance().accept(project, file)
+  } catch (e: Exception) {
+    when (e) {
+      is FileNotUnderTemplatesFolderException,
+      is FileNotValidMustacheExtensionException,
+      is ModuleNotFoundException,
+      is MustacheContextNotFoundException,
+      is TemplatesFolderNotFoundException -> {
         // file was not mustache context valid
-        logger.error(e.message)
-        return false
+        logger.debug(e.message)
       }
+
+      else -> throw e
     }
+    false
   }
 }

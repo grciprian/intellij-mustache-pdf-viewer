@@ -11,6 +11,8 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.messages.Topic
 import com.intellij.util.xmlb.XmlSerializerUtil.copyBean
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.*
 
 @State(name = "PdfViewerSettings", storages = [(Storage("pdf_viewer.xml"))])
@@ -29,10 +31,10 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
 
   var customMustacheFontsPath: String = Optional.ofNullable(ProjectUtil.getActiveProject()?.basePath)
     .map { "$it/$DEFAULT_MUSTACHE_FONTS_PATH" }
-//    .map {
-//      val filePath = Path.of(it)
-//      return@map if (Files.exists(filePath) && Files.isDirectory(filePath)) it else ""
-//    }
+    .map {
+      val filePath = Path.of(it)
+      return@map if (Files.exists(filePath) && Files.isDirectory(filePath)) it else ""
+    }
     .orElse("")
   var customMustachePrefix = DEFAULT_MUSTACHE_PREIFX
   var customMustacheSuffix = DEFAULT_MUSTACHE_SUFFIX

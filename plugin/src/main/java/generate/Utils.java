@@ -3,6 +3,7 @@ package generate;
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import exceptions.TemplatesFolderNotFoundException;
 import generate.PdfGenerationService.Pdf;
 
 import java.io.IOException;
@@ -25,7 +26,7 @@ public class Utils {
     Objects.requireNonNull(moduleDir, "moduleDir must not be null");
     var templatesFolder = VfsUtil.findRelativeFile(moduleDir, "src", "main", "resources", mustachePrefix);
     if (templatesFolder == null || !templatesFolder.exists()) {
-      throw new RuntimeException("Templates folder does not exist");
+      throw new TemplatesFolderNotFoundException("Templates folder does not exist");
     }
     return templatesFolder;
   }
@@ -50,7 +51,7 @@ public class Utils {
       Files.write(fileOutputPath, pdfContent.byteArray());
       return new Pdf(VfsUtil.findFile(fileOutputPath, true), pdfContent.structures());
     } catch (IOException exception) {
-      throw new RuntimeException("Could not process mustache file into PDF file: " + exception.getMessage());
+      throw new RuntimeException("Could not process mustache file into PDF file: " + exception.getMessage(), exception);
     }
   }
 }

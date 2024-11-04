@@ -12,7 +12,7 @@ import com.jetbrains.rdclient.fileEditors.FrontendFileEditorModelHandler
  * Created by liudongmiao on 2024-09-30.
  */
 class PdfFrontendFileEditorModelHandler : FrontendFileEditorModelHandler {
-  override fun accept(project: Project, file: VirtualFile, model: FileEditorModel): Boolean = PdfFileEditorProvider.accept(project, file, logger)
+  override fun accept(project: Project, file: VirtualFile, model: FileEditorModel): Boolean = accept(project, file, logger)
 
   override fun createEditorWithProvider(project: Project, lifetime: Lifetime, file: VirtualFile, model: FileEditorModel): FileEditorWithProvider {
     val provider = PdfFileEditorProvider()

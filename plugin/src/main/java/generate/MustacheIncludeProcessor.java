@@ -1,7 +1,6 @@
 package generate;
 
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -22,8 +21,6 @@ import static generate.Utils.getRelativeMustacheFilePathFromTemplatesPath;
 public class MustacheIncludeProcessor {
 
   private static final Logger logger = Logger.getInstance(MustacheIncludeProcessor.class);
-  // maybe make this customizable in settings?
-  private static final Long RECURSION_THRESHOLD = 500L;
   private static MustacheIncludeProcessor instance;
   private final Map<String, PdfFileExpirationWrapper> rootPdfFileMap = new HashMap<>();
   private final Map<String, IncludeProps> oldIncludePropsMap = new HashMap<>();
@@ -32,9 +29,8 @@ public class MustacheIncludeProcessor {
   private final String mustacheSuffix;
   private final String moduleName;
   // be careful to clean it up properly before each template compilation
-  private final Set<String> currentlyTemplateLoaderFoundIncludesNormalized = new HashSet<>();
+  private final Set<String> currentTemplateLoaderFoundIncludesNormalized = new HashSet<>();
   private final Mustache.Compiler mustacheCompiler;
-  private Pair<String, Long> recursionCounter = Pair.empty();
 
   private MustacheIncludeProcessor(String templatesPath, String mustacheSuffix, String moduleName) {
     Objects.requireNonNull(moduleName, "moduleName must not be null");
@@ -43,17 +39,9 @@ public class MustacheIncludeProcessor {
     this.moduleName = moduleName;
     this.mustacheCompiler = Mustache.compiler()
       .withLoader(name -> {
-        if (!Objects.equals(name, recursionCounter.first)) {
-          recursionCounter = new Pair<>(name, 1L);
-        } else {
-          recursionCounter = new Pair<>(recursionCounter.first, recursionCounter.second + 1);
-        }
-        if (recursionCounter.second > RECURSION_THRESHOLD) {
-          throw new RuntimeException("Recursion found for included template segment: " + name);
-        }
         var file = new File(templatesPath, name + "." + mustacheSuffix);
         var normalizedName = FileUtil.normalize(name).replaceAll("^/+", "");
-        if (file.exists()) currentlyTemplateLoaderFoundIncludesNormalized.add(normalizedName);
+        if (file.exists()) currentTemplateLoaderFoundIncludesNormalized.add(normalizedName);
         return new StringReader("");
       });
   }
@@ -71,7 +59,7 @@ public class MustacheIncludeProcessor {
     oldIncludePropsMap.putAll(includePropsMap);
     includePropsMap.clear();
     var root = VfsUtil.findFile(Path.of(templatesPath), true);
-    // TODO refactor includes retrieval
+    // TODO refactor includes retrieval?
     VfsUtil.processFileRecursivelyWithoutIgnored(root, mustacheFile -> {
       if (mustacheFile.isDirectory()) {
         return true;
@@ -85,13 +73,13 @@ public class MustacheIncludeProcessor {
 
       try {
         mustacheCompiler.defaultValue("").compile(new FileReader(mustacheFile.getPath())).execute(new Object());
-        currentlyTemplateLoaderFoundIncludesNormalized
+        currentTemplateLoaderFoundIncludesNormalized
           .forEach(include -> {
             var maybeExistingEntry = includePropsMap.getOrDefault(include, IncludeProps.getEmpty());
             maybeExistingEntry.directParents.add(relativePath);
             includePropsMap.put(include, new IncludeProps(maybeExistingEntry.directParents));
           });
-        currentlyTemplateLoaderFoundIncludesNormalized.clear();
+        currentTemplateLoaderFoundIncludesNormalized.clear();
       } catch (IOException e) {
         //TODO: customize this
         throw new RuntimeException(e);
@@ -223,6 +211,10 @@ public class MustacheIncludeProcessor {
           .flatMap(Set::stream)
           .filter(directParent -> !finalDp.contains(directParent))
           .collect(Collectors.toUnmodifiableSet());
+        // check if it got into recursion, if any of the processed dp is contained in this.directParents
+        if (this.directParents.stream().anyMatch(dp::contains)) {
+          dp = Set.of();
+        }
       }
     }
   }
