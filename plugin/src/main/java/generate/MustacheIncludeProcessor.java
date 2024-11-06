@@ -143,19 +143,19 @@ public class MustacheIncludeProcessor {
       });
   }
 
-  public VirtualFile processPdfFileForMustacheRoot(String root) {
+  public Path processPdfFileForMustacheRoot(String root) {
     if (rootPdfFileMap.get(root) == null || rootPdfFileMap.get(root).expired) {
       var pdf = getPdf(root, templatesPath, mustacheSuffix, moduleName);
       rootPdfFileMap.put(root, new PdfFileExpirationWrapper(pdf));
     }
-    return rootPdfFileMap.get(root).pdf.file();
+    return rootPdfFileMap.get(root).pdf.path();
   }
 
   // maybe rethink this flow
   public String getMustacheRootForPdfFile(VirtualFile pdfFile) throws RuntimeException {
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
-      .filter(entry -> Objects.equals(entry.getValue().pdf.file().getPath(), pdfFile.getPath()))
+      .filter(entry -> Objects.equals(entry.getValue().pdf.path().toString(), pdfFile.getPath()))
       .findAny()
       .map(Map.Entry::getKey)
       .orElseGet(() -> null);

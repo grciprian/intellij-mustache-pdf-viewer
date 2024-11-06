@@ -9,7 +9,6 @@ import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFil
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustachePdfFileEditorWrapper
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheRefreshPdfFileEditorTabs
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheUpdatePdfFileEditorTabs
-import com.intellij.ide.AppLifecycleListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
@@ -30,11 +29,10 @@ import exceptions.FileNotValidMustacheExtensionException
 import exceptions.ModuleNotFoundException
 import exceptions.MustacheContextNotFoundException
 import generate.MustacheIncludeProcessor
-import generate.Utils.*
+import generate.Utils.getRelativeMustacheFilePathFromTemplatesPath
+import generate.Utils.getTemplatesDir
 import kotlinx.collections.immutable.toImmutableSet
-import org.apache.commons.io.FileUtils
 import org.apache.commons.lang3.StringUtils
-import java.nio.file.Path
 
 @Service(Service.Level.PROJECT)
 class MustacheContextServiceImpl(private val project: Project) : MustacheContextService, Disposable {
@@ -46,7 +44,6 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
    * Listeners
    */
   private val fileChangedListener = FileChangedListener()
-  private val appLifecycleListener = MyAppLifecycleListener()
   private val fileEditorManagerListener = MyFileEditorManagerListener()
   private val mustacheFilePropsListener = MyPdfViewerMustacheFilePropsSettingsListener()
   private val mustacheFontsPathListener = MyPdfViewerMustacheFontsPathSettingsListener()
@@ -55,21 +52,10 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     Disposer.register(this, messageBusConnection)
     logger.debug("MustacheContextServiceImpl initialized for project: " + project.name)
 
-    messageBusConnection.subscribe(AppLifecycleListener.TOPIC, appLifecycleListener)
     messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileChangedListener)
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FILE_PROPS, mustacheFilePropsListener)
     messageBusConnection.subscribe(PdfViewerSettings.TOPIC_MUSTACHE_FONTS_PATH, mustacheFontsPathListener)
     messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileEditorManagerListener)
-  }
-
-  private inner class MyAppLifecycleListener : AppLifecycleListener {
-    override fun appClosing() {
-      cleanupMtdPdf()
-    }
-
-    private fun cleanupMtdPdf() {
-      FileUtils.deleteDirectory(Path.of(MUSTACHE_TEMPORARY_DIRECTORY).toFile())
-    }
   }
 
   private inner class FileChangedListener : BulkFileListener {

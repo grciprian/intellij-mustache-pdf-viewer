@@ -1,23 +1,21 @@
 package generate;
 
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import exceptions.TemplatesFolderNotFoundException;
 import generate.PdfGenerationService.Pdf;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Objects;
 
 import static com.intellij.openapi.vfs.VfsUtilCore.VFS_SEPARATOR_CHAR;
 import static java.util.Collections.EMPTY_MAP;
 
 public class Utils {
-
-  public static final String MUSTACHE_TEMPORARY_DIRECTORY = "MTD";
-  public static final String MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX = "mtf.pdf";
 
   private Utils() {
   }
@@ -41,15 +39,11 @@ public class Utils {
 
   public static Pdf getPdf(String relativeFilePath, String templatesPath, String mustacheSuffix, String moduleName) {
     try {
-      var rootOutputPath = Path.of(MUSTACHE_TEMPORARY_DIRECTORY);
-      if (Files.notExists(rootOutputPath)) Files.createDirectory(rootOutputPath);
-      var moduleOutputPath = Path.of("%s/%s".formatted(MUSTACHE_TEMPORARY_DIRECTORY, moduleName));
-      if (Files.notExists(moduleOutputPath)) Files.createDirectory(moduleOutputPath);
-      var fileOutputPath = Path.of("%s/%s/%s.%s".formatted(MUSTACHE_TEMPORARY_DIRECTORY, moduleName, relativeFilePath.replace(VFS_SEPARATOR_CHAR, '_'), MUSTACHE_TEMPORARY_FILE_PDF_SUFFIX)); // mtf MustacheTemporaryFile
-      if (Files.notExists(fileOutputPath)) Files.createFile(fileOutputPath);
+      var tempModuleDir = FileUtil.createTempDirectory(moduleName, "tmp");
+      var tempFile = new File(tempModuleDir, "%s.%s".formatted(relativeFilePath.replace(VFS_SEPARATOR_CHAR, '_'), "mtf.pdf"));
       var pdfContent = PdfGenerationService.getInstance(templatesPath, mustacheSuffix).generatePdf(EMPTY_MAP, relativeFilePath);
-      Files.write(fileOutputPath, pdfContent.byteArray());
-      return new Pdf(VfsUtil.findFile(fileOutputPath, true), pdfContent.structures());
+      var pdfFilePath = Files.write(tempFile.toPath(), pdfContent.byteArray());
+      return new Pdf(pdfFilePath, pdfContent.structures());
     } catch (IOException exception) {
       throw new RuntimeException("Could not process mustache file into PDF file: " + exception.getMessage(), exception);
     }

@@ -5,14 +5,18 @@ import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheTo
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.PdfFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.view.PdfEditorViewComponent
 import com.intellij.diff.util.FileEditorBase
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
+import exceptions.FileNotFoundException
 import generate.MustacheIncludeProcessor
 import kotlinx.collections.immutable.toImmutableSet
+import java.util.concurrent.CompletableFuture
 import javax.swing.DefaultSingleSelectionModel
 import javax.swing.JComponent
 
@@ -36,27 +40,31 @@ class MustachePdfFileEditorWrapper(
     Disposer.register(this, messageBusConnection)
     val mustacheContext = project.getService(MustacheContextService::class.java).getContext(mustacheFile)
     val mustacheIncludeProcessor = mustacheContext.mustacheIncludeProcessor
-    mustacheIncludeProcessor.getRootsForMustache(mustacheFile.path).forEach { addPdfFileEditorTab(it, mustacheIncludeProcessor) }
-    changeSelectionAndFocus(FocusedTabSelectionType.FIRST)
-    messageBusConnection.subscribe(
-      MustacheUpdatePdfFileEditorTabs.TOPIC,
-      MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs(it) }
-    )
-    _jbTabbedPane.model.addChangeListener {
-      val source = it.source
-      if (source !is DefaultSingleSelectionModel) return@addChangeListener
-      if (_jbTabbedPane.selectedIndex < 0 || _jbTabbedPane.selectedIndex >= _syncedTabbedEditors.size) {
-        _focusedSyncedTabEditor = null
-        return@addChangeListener
+    val tabsFutures = mustacheIncludeProcessor.getRootsForMustache(mustacheFile.path)
+      .map { addPdfFileEditorTab(it, mustacheIncludeProcessor) }
+    CompletableFuture.allOf(*tabsFutures.toTypedArray())
+      .thenRun {
+        changeSelectionAndFocus(FocusedTabSelectionType.FIRST)
+        messageBusConnection.subscribe(
+          MustacheUpdatePdfFileEditorTabs.TOPIC,
+          MustacheUpdatePdfFileEditorTabs { updatePdfFileEditorTabs(it) }
+        )
+        _jbTabbedPane.model.addChangeListener {
+          val source = it.source
+          if (source !is DefaultSingleSelectionModel) return@addChangeListener
+          if (_jbTabbedPane.selectedIndex < 0 || _jbTabbedPane.selectedIndex >= _syncedTabbedEditors.size) {
+            _focusedSyncedTabEditor = null
+            return@addChangeListener
+          }
+          val pdfFileEditor = _syncedTabbedEditors[source.selectedIndex]
+          pdfFileEditor.isFocused = mainEditor.textEditorWithPreview.component.isShowing
+          pdfFileEditor.tryReload()
+          if (_focusedSyncedTabEditor != null) _focusedSyncedTabEditor!!.isFocused = false
+          _focusedSyncedTabEditor = pdfFileEditor
+          project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
+            .rootChanged(pdfFileEditor.rootName, mustacheContext)
+        }
       }
-      val pdfFileEditor = _syncedTabbedEditors[source.selectedIndex]
-      pdfFileEditor.isFocused = mainEditor.textEditorWithPreview.component.isShowing
-      pdfFileEditor.tryReload()
-      if (_focusedSyncedTabEditor != null) _focusedSyncedTabEditor!!.isFocused = false
-      _focusedSyncedTabEditor = pdfFileEditor
-      project.messageBus.syncPublisher(MustacheToolWindowListener.TOPIC)
-        .rootChanged(pdfFileEditor.rootName, mustacheContext)
-    }
   }
 
   private fun updatePdfFileEditorTabs(originFile: VirtualFile) {
@@ -87,18 +95,27 @@ class MustachePdfFileEditorWrapper(
     }
 
     // add new identified root files
-    newRoots.forEach { rootName -> addPdfFileEditorTab(rootName, mustacheIncludeProcessor) }
-
-    // change selection and focus
-    changeSelectionAndFocus(FocusedTabSelectionType.FREESTYLE, true)
+    val tabFutures = newRoots
+      .map { rootName -> addPdfFileEditorTab(rootName, mustacheIncludeProcessor) }
+    CompletableFuture.allOf(*tabFutures.toTypedArray())
+      .thenRun {
+        // change selection and focus
+        changeSelectionAndFocus(FocusedTabSelectionType.FREESTYLE, true)
+      }
   }
 
-  private fun addPdfFileEditorTab(rootName: String, mustacheIncludeProcessor: MustacheIncludeProcessor) {
-    val pdfFile = mustacheIncludeProcessor.processPdfFileForMustacheRoot(rootName)
-    val editor = PdfFileEditor(project, pdfFile, rootName, mustacheIncludeProcessor)
-    Disposer.register(this, editor)
-    _jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
-    _syncedTabbedEditors.add(ADD_INDEX_FOR_NEW_TAB, editor)
+  private fun addPdfFileEditorTab(rootName: String, mustacheIncludeProcessor: MustacheIncludeProcessor): CompletableFuture<Boolean> {
+    val pdfFilePath = mustacheIncludeProcessor.processPdfFileForMustacheRoot(rootName)
+    val future = CompletableFuture<Boolean>()
+    ApplicationManager.getApplication().invokeLater {
+      val pdfFile = VfsUtil.findFile(pdfFilePath, true) ?: throw FileNotFoundException("Pdf file not found with path $pdfFilePath")
+      val editor = PdfFileEditor(project, pdfFile, rootName, mustacheIncludeProcessor)
+      Disposer.register(this, editor)
+      _jbTabbedPane.insertTab(rootName, null, editor.component, null, ADD_INDEX_FOR_NEW_TAB)
+      _syncedTabbedEditors.add(ADD_INDEX_FOR_NEW_TAB, editor)
+      future.complete(true)
+    }
+    return future
   }
 
   private fun changeSelectionAndFocus(focusedTabSelectionType: FocusedTabSelectionType, editorDependable: Boolean = false) {

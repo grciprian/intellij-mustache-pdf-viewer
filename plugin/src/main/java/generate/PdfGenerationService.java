@@ -2,7 +2,6 @@ package generate;
 
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
 import generate.PdfStructureService.Structure;
@@ -123,6 +122,6 @@ public class PdfGenerationService {
   public record PdfContent(byte[] byteArray, List<Structure> structures) {
   }
 
-  public record Pdf(VirtualFile file, List<Structure> structures) {
+  public record Pdf(Path path, List<Structure> structures) {
   }
 }
