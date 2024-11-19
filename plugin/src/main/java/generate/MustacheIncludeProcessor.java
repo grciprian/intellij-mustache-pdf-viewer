@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.StringReader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -155,10 +156,17 @@ public class MustacheIncludeProcessor {
   public String getMustacheRootForPdfFile(VirtualFile pdfFile) throws RuntimeException {
     return rootPdfFileMap.entrySet().stream()
       .filter(entry -> entry.getValue() != null)
-      .filter(entry -> Objects.equals(entry.getValue().pdf.path().toString(), pdfFile.getPath()))
+      .filter(entry -> {
+        try {
+          return Files.isSameFile(entry.getValue().pdf.path(), pdfFile.toNioPath());
+        } catch (IOException e) {
+          logger.debug("Could not test paths to get mustache root for pdf file: " + pdfFile.getPath(), e);
+        }
+        return false;
+      })
       .findAny()
       .map(Map.Entry::getKey)
-      .orElseGet(() -> null);
+      .orElse(null);
   }
 
   public Pdf getPdfForRoot(String root) {
@@ -211,6 +219,7 @@ public class MustacheIncludeProcessor {
           .flatMap(Set::stream)
           .filter(directParent -> !finalDp.contains(directParent))
           .collect(Collectors.toUnmodifiableSet());
+        // TODO investigate fix!!! it still bombs the IDE
         // check if it got into recursion, if any of the processed dp is contained in this.directParents
         if (this.directParents.stream().anyMatch(dp::contains)) {
           dp = Set.of();

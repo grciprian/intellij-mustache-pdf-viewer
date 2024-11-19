@@ -39,8 +39,9 @@ public class Utils {
 
   public static Pdf getPdf(String relativeFilePath, String templatesPath, String mustacheSuffix, String moduleName) {
     try {
-      var tempModuleDir = FileUtil.createTempDirectory(moduleName, "tmp");
-      var tempFile = new File(tempModuleDir, "%s.%s".formatted(relativeFilePath.replace(VFS_SEPARATOR_CHAR, '_'), "mtf.pdf"));
+      var tempDir = FileUtil.getTempDirectory();
+      var tempFile = new File(tempDir, "%s-%s.%s".formatted(moduleName, relativeFilePath.replace(VFS_SEPARATOR_CHAR, '_'), "mtf.pdf"));
+      tempFile.deleteOnExit();
       var pdfContent = PdfGenerationService.getInstance(templatesPath, mustacheSuffix).generatePdf(EMPTY_MAP, relativeFilePath);
       var pdfFilePath = Files.write(tempFile.toPath(), pdfContent.byteArray());
       return new Pdf(pdfFilePath, pdfContent.structures());
