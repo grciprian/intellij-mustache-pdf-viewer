@@ -121,7 +121,7 @@ class MustacheToolWindowFactory : ToolWindowFactory, DumbAware {
 
       buildTreeNodesFromStructures(rootNode, visitor)
       val tree = Tree(DefaultTreeModel(rootNode))
-      tree.addMouseListener(TreeMouseListener(project, _mustacheContext.templatesDir.path, _mustacheContext.mustacheSuffix) {
+      tree.addMouseListener(TreeMouseListener(project, _mustacheContext.templatesDir, _mustacheContext.mustacheSuffix) {
         _clickedNode = it
       })
 

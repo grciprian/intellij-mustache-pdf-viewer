@@ -20,20 +20,27 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
         settings.customForegroundColor != customForegroundColor.get() ||
         settings.customBackgroundColor != customBackgroundColor.get() ||
         settings.customIconColor != customIconColor.get() ||
-        settings.customMustacheFontsPath != customMustacheFontsPath.get() ||
-        settings.customMustachePrefix != customMustachePrefix.get() ||
-        settings.customMustacheSuffix != customMustacheSuffix.get() ||
-        settings.isVerticalSplit != isVerticalSplit.get()
-    } ?: false
+        settings.isVerticalSplit != isVerticalSplit.get() ||
+        settings.moduleContexts != moduleContexts.get()
+    } == true
   }
 
   override fun getDisplayName(): String = PdfViewerBundle.message("pdf.viewer.settings.display.name")
 
   override fun apply() {
     val wasSettingsModified = isModified
-    val wasMustacheFontsPathModified = settings.customMustacheFontsPath != settingsForm?.customMustacheFontsPath?.get()
-    val wasMustacheFilePropsModified = settings.customMustachePrefix != settingsForm?.customMustachePrefix?.get() ||
-      settings.customMustacheSuffix != settingsForm?.customMustacheSuffix?.get()
+    val modulePathsForWhichFontsPathHasBeenModified = settingsForm?.moduleContexts?.get()
+      ?.map { it.modulePath }
+      ?.filter { maybeNewPath ->
+        settings.moduleContexts
+          .map { it.modulePath }
+          .none { existingPath -> maybeNewPath == existingPath }
+      }
+    val moduleMustacheContextsForWhichFilePropsHaveBeenModified = settingsForm?.moduleContexts?.get()
+      ?.filter { maybeNewModuleMustacheContext ->
+        settings.moduleContexts
+          .none { existingModuleMustacheContext -> maybeNewModuleMustacheContext.templatesDir == existingModuleMustacheContext.templatesDir && maybeNewModuleMustacheContext.suffix == existingModuleMustacheContext.suffix }
+      }
     settings.run {
       enableDocumentAutoReload = settingsForm?.enableDocumentAutoReload?.get() ?: enableDocumentAutoReload
       defaultSidebarViewMode = settingsForm?.defaultSidebarViewMode?.get() ?: defaultSidebarViewMode
@@ -44,19 +51,17 @@ class PdfViewerConfigurable(val project: Project) : Configurable {
       customBackgroundColor = settingsForm?.customBackgroundColor?.get() ?: customBackgroundColor
       customForegroundColor = settingsForm?.customForegroundColor?.get() ?: customForegroundColor
       customIconColor = settingsForm?.customIconColor?.get() ?: customIconColor
-      customMustacheFontsPath = settingsForm?.customMustacheFontsPath?.get() ?: customMustacheFontsPath
-      customMustachePrefix = settingsForm?.customMustachePrefix?.get() ?: customMustachePrefix
-      customMustacheSuffix = settingsForm?.customMustacheSuffix?.get() ?: customMustacheSuffix
       isVerticalSplit = settingsForm?.isVerticalSplit?.get() ?: isVerticalSplit
+      moduleContexts = settingsForm?.moduleContexts?.get() ?: moduleContexts
     }
     if (wasSettingsModified) {
       settings.notifySettingsListeners()
     }
-    if (wasMustacheFontsPathModified) {
-      settings.notifyMustacheFontsPathSettingsListeners()
+    if (modulePathsForWhichFontsPathHasBeenModified?.isEmpty() == false) {
+      settings.notifyMustacheFontsPathSettingsListeners(modulePathsForWhichFontsPathHasBeenModified)
     }
-    if(wasMustacheFilePropsModified) {
-      settings.notifyMustacheFilePropsSettingsListeners()
+    if (moduleMustacheContextsForWhichFilePropsHaveBeenModified?.isEmpty() == false) {
+      settings.notifyMustacheFilePropsSettingsListeners(moduleMustacheContextsForWhichFilePropsHaveBeenModified)
     }
   }
 

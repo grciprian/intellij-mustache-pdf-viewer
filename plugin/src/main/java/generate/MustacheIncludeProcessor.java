@@ -28,15 +28,17 @@ public class MustacheIncludeProcessor {
   private final Map<String, IncludeProps> includePropsMap = new HashMap<>();
   private final String templatesPath;
   private final String mustacheSuffix;
+  private final String fontsDir;
   private final String moduleName;
   // be careful to clean it up properly before each template compilation
   private final Set<String> currentTemplateLoaderFoundIncludesNormalized = new HashSet<>();
   private final Mustache.Compiler mustacheCompiler;
 
-  private MustacheIncludeProcessor(String templatesPath, String mustacheSuffix, String moduleName) {
+  private MustacheIncludeProcessor(String templatesPath, String mustacheSuffix, String fontsDir, String moduleName) {
     Objects.requireNonNull(moduleName, "moduleName must not be null");
     this.templatesPath = templatesPath;
     this.mustacheSuffix = mustacheSuffix;
+    this.fontsDir = fontsDir;
     this.moduleName = moduleName;
     this.mustacheCompiler = Mustache.compiler()
       .withLoader(name -> {
@@ -47,12 +49,13 @@ public class MustacheIncludeProcessor {
       });
   }
 
-  public static MustacheIncludeProcessor getInstance(String templatesPath, String mustacheSuffix, String moduleName) {
+  public static MustacheIncludeProcessor getInstance(String templatesPath, String mustacheSuffix, String fontsDir, String moduleName) {
     if (instance != null
       && Objects.equals(instance.templatesPath, templatesPath)
       && Objects.equals(instance.mustacheSuffix, mustacheSuffix)
+      && Objects.equals(instance.fontsDir, fontsDir)
       && Objects.equals(instance.moduleName, moduleName)) return instance;
-    return instance = new MustacheIncludeProcessor(templatesPath, mustacheSuffix, moduleName);
+    return instance = new MustacheIncludeProcessor(templatesPath, mustacheSuffix, fontsDir, moduleName);
   }
 
   public void processFileIncludePropsMap() {
@@ -146,7 +149,7 @@ public class MustacheIncludeProcessor {
 
   public Path processPdfFileForMustacheRoot(String root) {
     if (rootPdfFileMap.get(root) == null || rootPdfFileMap.get(root).expired) {
-      var pdf = getPdf(root, templatesPath, mustacheSuffix, moduleName);
+      var pdf = getPdf(root, templatesPath, mustacheSuffix, fontsDir, moduleName);
       rootPdfFileMap.put(root, new PdfFileExpirationWrapper(pdf));
     }
     return rootPdfFileMap.get(root).pdf.path();

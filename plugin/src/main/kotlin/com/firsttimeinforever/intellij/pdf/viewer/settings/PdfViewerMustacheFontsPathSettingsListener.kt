@@ -1,5 +1,5 @@
 package com.firsttimeinforever.intellij.pdf.viewer.settings
 
 fun interface PdfViewerMustacheFontsPathSettingsListener {
-  fun fontsPathChanged(settings: PdfViewerSettings)
+  fun fontsPathChanged(modulePaths: List<String>)
 }

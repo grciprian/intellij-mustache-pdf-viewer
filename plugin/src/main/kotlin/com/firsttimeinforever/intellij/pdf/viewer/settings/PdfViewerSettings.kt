@@ -8,11 +8,11 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.messages.Topic
 import com.intellij.util.xmlb.XmlSerializerUtil.copyBean
-import java.nio.file.Files
-import java.nio.file.Path
+import exceptions.ModuleNotFoundException
 import java.util.*
 
 @State(name = "PdfViewerSettings", storages = [(Storage("pdf_viewer.xml"))])
@@ -29,27 +29,23 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
 
   var defaultSidebarViewMode: SidebarViewMode = SidebarViewMode.THUMBNAILS
 
-  var customMustacheFontsPath: String = Optional.ofNullable(ProjectUtil.getActiveProject()?.basePath)
-    .map { "$it/$DEFAULT_MUSTACHE_FONTS_PATH" }
-    .map {
-      val filePath = Path.of(it)
-      return@map if (Files.exists(filePath) && Files.isDirectory(filePath)) it else ""
-    }
-    .orElse("")
-  var customMustachePrefix = DEFAULT_MUSTACHE_PREIFX
-  var customMustacheSuffix = DEFAULT_MUSTACHE_SUFFIX
   var isVerticalSplit = true
+  var moduleContexts: List<ModuleMustacheContext> = ProjectUtil.getActiveProject()
+    ?.let { ModuleManager.getInstance(it).sortedModules }
+    ?.map { ModuleMustacheContext.getDefault(it) }
+    ?.toList()
+    ?: ArrayList<ModuleMustacheContext>()
 
   fun notifySettingsListeners() {
     ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_SETTINGS).settingsChanged(this)
   }
 
-  fun notifyMustacheFontsPathSettingsListeners() {
-    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE_FONTS_PATH).fontsPathChanged(this)
+  fun notifyMustacheFontsPathSettingsListeners(modulePaths: List<String>) {
+    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE_FONTS_PATH).fontsPathChanged(modulePaths)
   }
 
-  fun notifyMustacheFilePropsSettingsListeners() {
-    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE_FILE_PROPS).filePropsChanged(this)
+  fun notifyMustacheFilePropsSettingsListeners(moduleMustacheContexts: List<ModuleMustacheContext>) {
+    ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC_MUSTACHE_FILE_PROPS).filePropsChanged(moduleMustacheContexts)
   }
 
   override fun getState() = this
@@ -79,9 +75,9 @@ class PdfViewerSettings : PersistentStateComponent<PdfViewerSettings> {
 
     const val DEFAULT_MUSTACHE_FONTS_PATH = "fonts"
 
-    const val DEFAULT_MUSTACHE_PREIFX = "templates"
 
-    const val DEFAULT_MUSTACHE_SUFFIX = "mustache"
+    fun List<ModuleMustacheContext>.getByModuleDir(moduleDir: String): ModuleMustacheContext =
+      this.find { it.modulePath == moduleDir } ?: throw ModuleNotFoundException("Could not get moduleDir")
 
 //    val ILLEGAL_CHARACTERS_REGEX: Pattern = Pattern.compile("[\\/\\n\\r\\t\\u0000\\f`\\?\\*\\\\<>|\\\":]\n")
 

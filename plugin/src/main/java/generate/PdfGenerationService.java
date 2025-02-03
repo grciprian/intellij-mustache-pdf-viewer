@@ -1,11 +1,11 @@
 package generate;
 
-import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings;
 import com.intellij.openapi.diagnostic.Logger;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
 import generate.PdfStructureService.Structure;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.jetbrains.annotations.Nullable;
 import org.jsoup.Jsoup;
 import org.jsoup.helper.W3CDom;
 import org.jsoup.nodes.Document;
@@ -31,28 +31,35 @@ public class PdfGenerationService {
 
   private final String templatesPath;
   private final String mustacheSuffix;
+  private final String fontsDir;
   private final Mustache.Compiler mustacheCompiler;
 
-  public PdfGenerationService(String templatesPath, String mustacheSuffix) {
+  public PdfGenerationService(String templatesPath, String mustacheSuffix, String fontsDir) {
     this.templatesPath = templatesPath;
     this.mustacheSuffix = mustacheSuffix;
+    this.fontsDir = fontsDir;
     this.mustacheCompiler = CustomMustacheCompiler.getInstance(templatesPath, mustacheSuffix).getMustacheCompiler();
   }
 
-  public static PdfGenerationService getInstance(String templatesPath, String mustacheSuffix) {
+  public static PdfGenerationService getInstance(String templatesPath, String mustacheSuffix, String fontsDir) {
     if (instance != null
       && Objects.equals(instance.templatesPath, templatesPath)
-      && Objects.equals(instance.mustacheSuffix, mustacheSuffix)) return instance;
-    return instance = new PdfGenerationService(templatesPath, mustacheSuffix);
+      && Objects.equals(instance.mustacheSuffix, mustacheSuffix)
+      && Objects.equals(instance.fontsDir, fontsDir)) return instance;
+    return instance = new PdfGenerationService(templatesPath, mustacheSuffix, fontsDir);
   }
 
-  private static void writePdfContentToStream(OutputStream outputStream, String html) throws IOException {
+  private static void writePdfContentToStream(OutputStream outputStream, String html, String fontsDir) throws IOException {
     var builder = new PdfRendererBuilder();
     var document = convertHtmlToXHtml(html);
     builder.toStream(outputStream);
     builder.withW3cDocument(new W3CDom().fromJsoup(document), "/");
-    addFonts(builder);
+    addFonts(builder, fontsDir);
     builder.run();
+  }
+
+  private static void writePdfContentToStream(OutputStream outputStream, String html) throws IOException {
+    writePdfContentToStream(outputStream, html, null);
   }
 
   private static Document convertHtmlToXHtml(String pdfContent) {
@@ -61,8 +68,9 @@ public class PdfGenerationService {
     return document;
   }
 
-  private static void addFonts(PdfRendererBuilder pdfRendererBuilder) {
-    var f = new File(PdfViewerSettings.Companion.getInstance().getCustomMustacheFontsPath());
+  private static void addFonts(PdfRendererBuilder pdfRendererBuilder, @Nullable String fontsDir) {
+    if (fontsDir == null) return;
+    var f = new File(fontsDir);
     if (f.isDirectory()) {
       var files = f.listFiles((dir, name) -> {
         var lower = name.toLowerCase();
@@ -86,7 +94,7 @@ public class PdfGenerationService {
       var file = Path.of("%s/%s.%s".formatted(templatesPath, relativeFilePath, mustacheSuffix)).toFile();
       var template = mustacheCompiler.compile(new FileReader(file));
       var html = template.execute(model);
-      writePdfContentToStream(outputStream, html);
+      writePdfContentToStream(outputStream, html, fontsDir);
       var pdf = outputStream.toByteArray();
       if (pdf.length == 0) throw new RuntimeException(PDF_GENERATION_EMPTY_FILE);
       var structure = PdfStructureService.getStructure(relativeFilePath, template, templatesPath, mustacheSuffix);

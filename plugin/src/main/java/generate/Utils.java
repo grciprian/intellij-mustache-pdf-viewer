@@ -2,15 +2,11 @@ package generate;
 
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtilRt;
-import com.intellij.openapi.vfs.VfsUtil;
-import com.intellij.openapi.vfs.VirtualFile;
-import exceptions.TemplatesFolderNotFoundException;
 import generate.PdfGenerationService.Pdf;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Objects;
 
 import static com.intellij.openapi.vfs.VfsUtilCore.VFS_SEPARATOR_CHAR;
 import static java.util.Collections.EMPTY_MAP;
@@ -20,14 +16,14 @@ public class Utils {
   private Utils() {
   }
 
-  public static VirtualFile getTemplatesDir(VirtualFile moduleDir, String mustachePrefix) {
-    Objects.requireNonNull(moduleDir, "moduleDir must not be null");
-    var templatesFolder = VfsUtil.findRelativeFile(moduleDir, "src", "main", "resources", mustachePrefix);
-    if (templatesFolder == null || !templatesFolder.exists()) {
-      throw new TemplatesFolderNotFoundException("Templates folder does not exist");
-    }
-    return templatesFolder;
-  }
+//  public static VirtualFile getTemplatesDir(VirtualFile moduleDir, String mustachePrefix) {
+//    Objects.requireNonNull(moduleDir, "moduleDir must not be null");
+//    var templatesFolder = VfsUtil.findRelativeFile(moduleDir, "src", "main", "resources", mustachePrefix);
+//    if (templatesFolder == null || !templatesFolder.exists()) {
+//      throw new TemplatesFolderNotFoundException("Templates folder does not exist");
+//    }
+//    return templatesFolder;
+//  }
 
   public static String getRelativeMustacheFilePathFromTemplatesPath(String filePath, String templatesPath, String mustacheSuffix) {
     var extensionPointIndex = StringUtilRt.lastIndexOf(filePath, '.', 0, filePath.length());
@@ -37,12 +33,12 @@ public class Utils {
     return filePath.substring(templatesPath.length() + 1, extensionPointIndex);
   }
 
-  public static Pdf getPdf(String relativeFilePath, String templatesPath, String mustacheSuffix, String moduleName) {
+  public static Pdf getPdf(String relativeFilePath, String templatesPath, String mustacheSuffix, String fontsPath, String moduleName) {
     try {
       var tempDir = FileUtil.getTempDirectory();
       var tempFile = new File(tempDir, "%s-%s.%s".formatted(moduleName, relativeFilePath.replace(VFS_SEPARATOR_CHAR, '_'), "mtf.pdf"));
       tempFile.deleteOnExit();
-      var pdfContent = PdfGenerationService.getInstance(templatesPath, mustacheSuffix).generatePdf(EMPTY_MAP, relativeFilePath);
+      var pdfContent = PdfGenerationService.getInstance(templatesPath, mustacheSuffix, fontsPath).generatePdf(EMPTY_MAP, relativeFilePath);
       var pdfFilePath = Files.write(tempFile.toPath(), pdfContent.byteArray());
       return new Pdf(pdfFilePath, pdfContent.structures());
     } catch (IOException exception) {

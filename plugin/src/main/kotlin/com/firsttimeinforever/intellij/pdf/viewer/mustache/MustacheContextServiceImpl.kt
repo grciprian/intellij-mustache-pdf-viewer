@@ -2,9 +2,11 @@ package com.firsttimeinforever.intellij.pdf.viewer.mustache
 
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowFactory
 import com.firsttimeinforever.intellij.pdf.viewer.mustache.toolwindow.MustacheToolWindowListener
+import com.firsttimeinforever.intellij.pdf.viewer.settings.ModuleMustacheContext
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFilePropsSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerMustacheFontsPathSettingsListener
 import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings
+import com.firsttimeinforever.intellij.pdf.viewer.settings.PdfViewerSettings.Companion.getByModuleDir
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheFileEditor
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustachePdfFileEditorWrapper
 import com.firsttimeinforever.intellij.pdf.viewer.ui.editor.mustache.MustacheRefreshPdfFileEditorTabs
@@ -30,7 +32,6 @@ import exceptions.ModuleNotFoundException
 import exceptions.MustacheContextNotFoundException
 import generate.MustacheIncludeProcessor
 import generate.Utils.getRelativeMustacheFilePathFromTemplatesPath
-import generate.Utils.getTemplatesDir
 import kotlinx.collections.immutable.toImmutableSet
 import org.apache.commons.lang3.StringUtils
 
@@ -60,12 +61,16 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
   private inner class FileChangedListener : BulkFileListener {
     override fun after(events: MutableList<out VFileEvent>) {
-      watchPath(
-        PdfViewerSettings.instance.customMustacheFontsPath, events
-      ) { _, _ -> PdfViewerSettings.instance.notifyMustacheFontsPathSettingsListeners() }
+      PdfViewerSettings.instance.moduleContexts
+        .map { it.fontsDir }
+        .forEach {
+          watchPath(
+            it, events
+          ) { _, _ -> PdfViewerSettings.instance.notifyMustacheFontsPathSettingsListeners(listOf(it)) }
+        }
       moduleMustacheContextCache.values.forEach {
         watchPath(
-          it.templatesDir.path, events
+          it.templatesDir, events
         ) { file, event ->
           logger.debug("Target file ${file?.path} changed. Reloading current view.")
           file ?: return@watchPath
@@ -226,7 +231,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   }
 
   private inner class MyPdfViewerMustacheFontsPathSettingsListener : PdfViewerMustacheFontsPathSettingsListener {
-    override fun fontsPathChanged(settings: PdfViewerSettings) {
+    override fun fontsPathChanged(modulePaths: List<String>) {
       FileEditorManager.getInstance(project).allEditors.asSequence()
         .filter { it is TextEditorWithPreview && it.name == MustacheFileEditor.NAME }
         .map { Pair(it.file, ((it as TextEditorWithPreview).previewEditor as MustachePdfFileEditorWrapper).syncedTabbedEditors) }
@@ -235,6 +240,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         }, {
           it.second.map { v -> v.rootName }
         })
+        .filter { mapEntry -> modulePaths.contains(mapEntry.key) }
         .forEach { (modulePath, rootNames) ->
           val rootNamesSet = rootNames.flatten().toSet()
           val mustacheContext =
@@ -249,7 +255,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
   }
 
   private inner class MyPdfViewerMustacheFilePropsSettingsListener : PdfViewerMustacheFilePropsSettingsListener {
-    override fun filePropsChanged(settings: PdfViewerSettings) {
+    override fun filePropsChanged(moduleMustacheContexts: List<ModuleMustacheContext>) {
       val getEditorFiles = {
         FileEditorManager.getInstance(project).allEditors
           .filter {
@@ -266,21 +272,28 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
       // get editors for all files under old templates folder
       val beforeModMustacheEditorsFiles = getEditorFiles()
       // now change props from settings
-      FileEditorManager.getInstance(project).allEditors
-        .groupBy {
-          getModuleInfo(project, it.file)
-        }
-        .keys
+//      FileEditorManager.getInstance(project).allEditors
+//        .groupBy {
+//          getModuleInfo(project, it.file)
+//        }
+//        .keys
+      moduleMustacheContexts
         .forEach {
-          val templatesDir = getTemplatesDir(it.dir, settings.customMustachePrefix)
-          moduleMustacheContextCache[it.dir.path] = MustacheContextInternal(
-            MustacheIncludeProcessor.getInstance(templatesDir.path, settings.customMustacheSuffix, it.name),
-            templatesDir,
-            settings.customMustacheSuffix
+//          val moduleMustacheContext = moduleMustacheContexts.getByModuleDir(it.dir.path)
+          moduleMustacheContextCache[it.modulePath] = MustacheContextInternal(
+            MustacheIncludeProcessor.getInstance(
+              it.templatesDir,
+              it.suffix,
+              it.fontsDir,
+              it.moduleName
+            ),
+            it.templatesDir,
+            it.suffix
           )
         }
       // get editors for all files under the new templates folder
       val afterModMustacheEditorsFiles = getEditorFiles()
+
       val mustacheEditorsFiles = beforeModMustacheEditorsFiles.plus(afterModMustacheEditorsFiles)
 
       // if the editor array is empty then we have nothing to worry about
@@ -313,11 +326,16 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     val moduleInfo = getModuleInfo(project, file)
 
     val internal = if (moduleMustacheContextCache[moduleInfo.dir.path] == null) {
-      val templatesDir = getTemplatesDir(moduleInfo.dir, PdfViewerSettings.instance.customMustachePrefix)
+      val moduleMustacheContext = PdfViewerSettings.instance.moduleContexts.getByModuleDir(moduleInfo.dir.path)
       val context = MustacheContextInternal(
-        MustacheIncludeProcessor.getInstance(templatesDir.path, PdfViewerSettings.instance.customMustacheSuffix, moduleInfo.name),
-        templatesDir,
-        PdfViewerSettings.instance.customMustacheSuffix
+        MustacheIncludeProcessor.getInstance(
+          moduleMustacheContext.templatesDir,
+          moduleMustacheContext.suffix,
+          moduleMustacheContext.fontsDir,
+          moduleInfo.name
+        ),
+        moduleMustacheContext.templatesDir,
+        moduleMustacheContext.suffix
       )
       moduleMustacheContextCache[moduleInfo.dir.path] = context
       logger.debug("Initializing and caching mustache context for module... " + moduleInfo.name)
@@ -330,15 +348,15 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
     if (file.extension != internal.mustacheSuffix) {
       throw FileNotValidMustacheExtensionException("File does not have a valid mustache extension")
     }
-    if (!VfsUtil.isUnder(file, setOf(internal.templatesDir))) {
+    if (!VfsUtil.isUnder(file.path, setOf(internal.templatesDir))) {
       throw FileNotUnderTemplatesFolderException(
-        "File is not under templates folder [templatesPath, filePath] [${internal.templatesDir.path}, ${file.path}]"
+        "File is not under templates folder [templatesPath, filePath] [${internal.templatesDir}, ${file.path}]"
       )
     }
 
     return MustacheContext(
       internal,
-      getRelativeMustacheFilePathFromTemplatesPath(file.path, internal.templatesDir.path, internal.mustacheSuffix)
+      getRelativeMustacheFilePathFromTemplatesPath(file.path, internal.templatesDir, file.extension)
     )
   }
 
@@ -392,8 +410,9 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
 
       if (events.any {
           file = it.file ?: return
+          val cleanFile = file!!
           event = WatcherFileEvent(WatcherFileEvent.Type.CHANGE_OTHER_PROPERTY, it)
-          val isDirectory = file!!.isDirectory
+          val isDirectory = cleanFile.isDirectory
           if (it is VFileCopyEvent) {
             event = WatcherFileEvent(WatcherFileEvent.Type.COPY, it)
             return@any checkFilePathWithWatchedPathBasedOnFileType(
@@ -403,11 +422,11 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           }
           if (it is VFileCreateEvent) {
             event = WatcherFileEvent(WatcherFileEvent.Type.CREATE, it)
-            return@any checkFilePathWithWatchedPathBasedOnFileType(file?.path, isDirectory)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(cleanFile.path, isDirectory)
           }
           if (it is VFileDeleteEvent) {
             event = WatcherFileEvent(WatcherFileEvent.Type.DELETE, it)
-            return@any checkFilePathWithWatchedPathBasedOnFileType(file?.path, isDirectory)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(cleanFile.path, isDirectory)
           }
           if (it is VFileMoveEvent) {
             val oldPathCheck = checkFilePathWithWatchedPathBasedOnFileType(it.oldPath, isDirectory)
@@ -425,7 +444,7 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
           }
           if (it is VFileContentChangeEvent) {
             event = WatcherFileEvent(WatcherFileEvent.Type.CHANGE_CONTENT, it)
-            return@any checkFilePathWithWatchedPathBasedOnFileType(file?.path, isDirectory)
+            return@any checkFilePathWithWatchedPathBasedOnFileType(cleanFile.path, isDirectory)
           }
           if (it is VFilePropertyChangeEvent) {
             event = if (it.oldPath != it.newPath) {
@@ -441,18 +460,20 @@ class MustacheContextServiceImpl(private val project: Project) : MustacheContext
         fileWatcher.run(file, event!!)
       }
     }
+
+
   }
 
   data class MustacheContextInternal(
     val mustacheIncludeProcessor: MustacheIncludeProcessor,
-    val templatesDir: VirtualFile,
+    val templatesDir: String,
     val mustacheSuffix: String
   )
 }
 
 data class MustacheContext(
   val mustacheIncludeProcessor: MustacheIncludeProcessor,
-  val templatesDir: VirtualFile,
+  val templatesDir: String,
   val mustacheSuffix: String,
   val relativeFilePath: String
 ) {
